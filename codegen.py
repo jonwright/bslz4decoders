@@ -18,6 +18,7 @@ INCLUDES = """
 
 #include <stdlib.h>   /* malloc and friends */
 #include <stdint.h>   /* uint32_t etc */
+#include <string.h>   /* memcpy */
 #include <stdio.h>    /* print error message before killing process(!?!?) */
 #include <lz4.h>      /* assumes you have this already */
 """% ( __file__, time.ctime())
@@ -222,6 +223,8 @@ read_starts = cfrag( """
    }
 """ ),
 print_starts = cfrag( """
+   printf("total_output_length %ld\\n", total_output_length);
+   printf("blocks_length %d\\n", blocks_length);
    for( int i = 0; i < blocks_length ; i++ )
        printf("%d %d, ", i, blocks[i]);
 """ ),
@@ -252,32 +255,45 @@ lz4decoders = cfragments(
     if (error) ERR("Error decoding LZ4");
     /* last block, might not be full blocksize */
     {
-      int lastblock = ((int) output_length - blocksize * (blocks_length - 1));
+      int lastblock = (int) output_length - blocksize * (blocks_length - 1);
+      /* last few bytes are copied flat */
+      int copied = lastblock % ( 8 * itemsize );
+      lastblock -= copied;
+      memcpy( &output[ output_length - (size_t) copied ], 
+              &compressed[ compressed_length - (size_t) copied ], (size_t) copied );
+      int nbytes = (int) READ32BE( compressed + blocks[blocks_length - 1]);
       int ret = LZ4_decompress_safe( compressed + blocks[blocks_length-1] + 4u,
                                      output + (blocks_length-1) * blocksize,
-                                     (int) READ32BE( compressed + blocks[blocks_length - 1]),
+                                     nbytes,
                                      lastblock );
       if ( CHECK_RETURN_VALS && ( ret != lastblock ) ) ERR("Error decoding last LZ4 block");
     }
-
     """),
     # without using the blocks
     onecore_lz4 = cfrag("""
     int p = 12;
-    for( int i = 1; i < blocks_length - 1 ; i++ ){
-       int nbytes = (int) READ32BE( ( compressed + p  ) );
-       int ret = LZ4_decompress_safe( compressed + p + 4u,
-                                      output + i * blocksize,
+    for( int i = 0; i < blocks_length - 1 ; ++i ){
+       int nbytes = (int) READ32BE( &compressed[p] );
+       int ret = LZ4_decompress_safe( &compressed[p + 4],
+                                      &output[i * blocksize],
                                       nbytes,
                                       blocksize );
       if ( CHECK_RETURN_VALS && ( ret != blocksize ) ) ERR("Error LZ4 block");
-       p = p + nbytes + 4;
+      p = p + nbytes + 4;
     }
+    /* last block, might not be full blocksize */
     {
       int lastblock = (int) output_length - blocksize * (blocks_length - 1);
-      int ret = LZ4_decompress_safe( compressed + p + 4u ,
-                                     output + (blocks_length-1) * blocksize,
-                                     (int) READ32BE( compressed + p ),
+      /* last few bytes are copied flat */
+      int copied = lastblock % ( 8 * itemsize );
+      lastblock -= copied;
+      memcpy( &output[ output_length - (size_t) copied ], 
+              &compressed[ compressed_length - (size_t) copied ], (size_t) copied );
+
+      int nbytes = (int) READ32BE( &compressed[p] );
+      int ret = LZ4_decompress_safe( &compressed[p + 4],
+                                     &output[(blocks_length-1) * blocksize],
+                                     nbytes,
                                      lastblock );
       if ( CHECK_RETURN_VALS && ( ret != lastblock ) ) ERR("Error decoding last LZ4 block");
     }
