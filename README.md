@@ -8,5 +8,11 @@ Jon Wright, 2021
 
 [About bslz4](about_bslz4.md)
 
-  python codegen.py bslz4decoders
-  CFLAGS="-fopenmp" f2py -c bslz4decoders.pyf bslz4decoders.c -llz4
+```
+  git clone https://github.com/jonwright/bslz4encoders
+  git submodule init
+  git submodule update
+  # python codegen.py bslz4decoders
+  # CFLAGS="-fopenmp" f2py -c bslz4decoders.pyf bslz4decoders.c -llz4
+  make
+```

@@ -1,0 +1,3 @@
+[submodule "bitshuffle"]
+	path = bitshuffle
+	url = https://github.com/kiyo-masui/bitshuffle
