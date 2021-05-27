@@ -1,6 +1,7 @@
 
 
 import h5py, hdf5plugin, bslz4decoders, numpy as np
+from testcases import testcases
 
 def get_frame_h5py( h5name, dset, frame ):
     with h5py.File(h5name, "r") as h5f:
@@ -62,10 +63,9 @@ if __name__=="__main__":
         hname = sys.argv[1]
         dsets = [ d for d in sys.argv[2:] ]
     import timeit, sys
-    for d in dsets:
+    for hname, d in testcases:
         print()
-        bench( get_frame_h5py, hname, d, 0 )
-        benchiter( get_frames_h5py, hname, d )
         bench( get_chunk, hname, d, 0 )
+        bench( get_frame_h5py, hname, d, 0 )
         benchiter( get_chunks, hname, d )
-
+        benchiter( get_frames_h5py, hname, d )
