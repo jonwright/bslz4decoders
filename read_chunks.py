@@ -1,6 +1,6 @@
 
 
-import h5py, hdf5plugin
+import h5py, hdf5plugin, bslz4decoders, numpy as np
 
 def get_frame_h5py( h5name, dset, frame ):
     with h5py.File(h5name, "r") as h5f:
@@ -14,7 +14,11 @@ def get_chunk( h5name, dset, frame ):
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
-        return dset.id.read_direct_chunk( (frame, 0, 0) ), dset.shape, dset.dtype
+        # inefficient
+        buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
+                           np.uint8 )
+        csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
+        return buffer[:csize].copy(), dset.shape, dset.dtype        
 
 def get_frames_h5py( h5name, dset ):
     with h5py.File(h5name, "r") as h5f:
@@ -28,8 +32,12 @@ def get_chunks( h5name, dset ):
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
+        # inefficient
+        buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
+                           np.uint8 ) 
         for frame in range(dset.shape[0]):
-            yield dset.id.read_direct_chunk( (frame, 0, 0) ), dset.shape, dset.dtype
+            csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
+            yield buffer[:csize], dset.shape, dset.dtype
 
 def bench( func, *args ):
     start = timeit.default_timer()
@@ -46,13 +54,18 @@ def benchiter( func, *args ):
 
 
 if __name__=="__main__":
-    hname = "bslz4testcases.h5"
-    get_chunk( hname, 'data_uint8', 0 )
+    import sys
+    if len(sys.argv) == 1:
+        hname = "bslz4testcases.h5"
+        dsets = [ "data_uint%d"%(i) for i in (8,16,32) ]
+    else:
+        hname = sys.argv[1]
+        dsets = [ d for d in sys.argv[2:] ]
     import timeit, sys
-    for s in [8,16,32]:
+    for d in dsets:
         print()
-        bench( get_frame_h5py, "bslz4testcases.h5", "data_uint%d"%(s), 0 )
-        benchiter( get_frames_h5py, "bslz4testcases.h5", "data_uint%d"%(s) )
-        bench( get_chunk, "bslz4testcases.h5", "data_uint%d"%(s), 0 )
-        benchiter( get_chunks, "bslz4testcases.h5", "data_uint%d"%(s) )
+        bench( get_frame_h5py, hname, d, 0 )
+        benchiter( get_frames_h5py, hname, d )
+        bench( get_chunk, hname, d, 0 )
+        benchiter( get_chunks, hname, d )
 
