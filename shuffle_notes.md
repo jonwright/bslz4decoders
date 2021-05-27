@@ -114,3 +114,30 @@ int64_t bshuf_shuffle_bit_eightelem_scal(const void* in, void* out, \
     return size * elem_size;
 }
 ```
+
+
+From https://stackoverflow.com/questions/6930667/what-is-the-fastest-way-to-transpose-the-bits-in-an-8x8-block-on-bits
+
+```
+uint8_t get_byte(uint64_t matrix, unsigned col)
+{
+    const uint64_t column_mask = 0x8080808080808080ull;
+    const uint64_t magic       = 0x2040810204081ull;
+
+    return ((matrix << (7 - col)) & column_mask) * magic  >> 56;
+}
+
+// You may need to change the endianness if you address the data in a different way
+uint64_t block8x8 = ((uint64_t)byte[7] << 56) | ((uint64_t)byte[6] << 48)
+                  | ((uint64_t)byte[5] << 40) | ((uint64_t)byte[4] << 32)
+                  | ((uint64_t)byte[3] << 24) | ((uint64_t)byte[2] << 16)
+                  | ((uint64_t)byte[1] <<  8) |  (uint64_t)byte[0];
+
+for (int i = 0; i < 8; i++)
+    byte_out[i] = get_byte(block8x8, i);
+```
+Also:
+
+https://github.com/dsnet/matrix-transpose/blob/master/matrix_transpose.c
+
+There is also code in hackers delight for 32x32 unrolled. One strange thing, transpose != untranpose. How is that.
