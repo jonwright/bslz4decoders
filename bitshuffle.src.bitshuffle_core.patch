@@ -1,0 +1,46 @@
+diff --git a/src/bitshuffle_core.c b/src/bitshuffle_core.c
+index 8028e3a..240bebf 100644
+--- a/src/bitshuffle_core.c
++++ b/src/bitshuffle_core.c
+@@ -1659,6 +1659,41 @@ int64_t bshuf_untrans_bit_elem(const void* in, void* out, const size_t size,
+     return count;
+ }
+ 
++int64_t bshuf_trans_byte_bitrow_elem(const void* in, void* out, const size_t size,
++        const size_t elem_size) {
++
++    int64_t count;
++#ifdef USEAVX2
++    count = bshuf_trans_byte_bitrow_AVX(in, out, size, elem_size);
++#elif defined(USESSE2)
++    count = bshuf_trans_byte_bitrow_SSE(in, out, size, elem_size);
++#elif defined(USEARMNEON)
++    count = bshuf_trans_byte_bitrow_NEON(in, out, size, elem_size);
++#else
++    count = bshuf_trans_byte_bitrow_scal(in, out, size, elem_size);
++#endif
++    return count;
++}
++
++int64_t bshuf_shuffle_bit_eightelem(const void* in, void* out, const size_t size,
++        const size_t elem_size) {
++
++    int64_t count;
++#ifdef USEAVX2
++    count = bshuf_shuffle_bit_eightelem_AVX(in, out, size, elem_size);
++#elif defined(USESSE2)
++    count = bshuf_shuffle_bit_eightelem_SSE(in, out, size, elem_size);
++#elif defined(USEARMNEON)
++    count = bshuf_shuffle_bit_eightelem_NEON(in, out, size, elem_size);
++#else
++    count = bshuf_shuffle_bit_eightelem_scal(in, out, size, elem_size);
++#endif
++    return count;
++}
++
++
++
++
+ 
+ /* ---- Wrappers for implementing blocking ---- */
+ 

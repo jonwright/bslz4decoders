@@ -1,6 +1,6 @@
 
 
-import h5py, hdf5plugin, bslz4decoders, numpy as np
+import h5py, hdf5plugin, bslz4decoders, numpy as np, struct
 from testcases import testcases
 
 def get_frame_h5py( h5name, dset, frame ):
@@ -40,6 +40,19 @@ def get_chunks( h5name, dset ):
             csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
             yield buffer[:csize], dset.shape, dset.dtype
 
+            
+def get_blocks( chunk, shape, dtyp ):
+    # We do this in python as it doesn't seem worth making a call back
+    # ... otherwise need to learn to call free on a numpy array 
+    total_bytes, blocksize = struct.unpack_from("!QL", chunk, 0)
+    if blocksize == 0:
+        blocksize = 8192
+    nblocks =  (total_bytes + blocksize - 1) // blocksize
+    blocks = np.empty( nblocks, np.uint32 )
+    bslz4decoders.read_starts( chunk, dtyp.itemsize, blocksize, blocks )
+    return blocksize, blocks
+    
+            
 def bench( func, *args ):
     start = timeit.default_timer()
     func(*args)
@@ -69,3 +82,7 @@ if __name__=="__main__":
         bench( get_frame_h5py, hname, d, 0 )
         benchiter( get_chunks, hname, d )
         benchiter( get_frames_h5py, hname, d )
+
+        chunk, shape, dtyp = get_chunk( hname, d, 0 )
+        bench( get_blocks, chunk, shape, dtyp )
+            
