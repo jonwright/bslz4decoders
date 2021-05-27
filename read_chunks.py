@@ -1,7 +1,7 @@
 
 
-import h5py, hdf5plugin, struct
-import numpy as np, bslz4decoders
+import h5py, hdf5plugin, bslz4decoders, numpy as np, struct
+from testcases import testcases
 
 def get_frame_h5py( h5name, dset, frame ):
     with h5py.File(h5name, "r") as h5f:
@@ -15,18 +15,11 @@ def get_chunk( h5name, dset, frame ):
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
-        return dset.id.read_direct_chunk( (frame, 0, 0) ), (dset.shape[1], dset.shape[2]), dset.dtype
-
-def get_blocks( chunk, shp, dtyp ):
-    total_output_size, blocksize = struct.unpack_from( "!QL", chunk, 0 )
-    print(total_output_size, blocksize)
-    assert total_output_size == shp[0]*shp[1]*dtyp.itemsize
-    if blocksize == 0:
-        blocksize = 8192
-    nblocks = (total_output_size + blocksize - 1 ) // ( blocksize )
-    blocks = np.empty( nblocks, dtype = np.uint32 )
-    bslz4decoders.read_starts( chunk, dtyp.itemsize, blocksize, blocks )
-    return blocksize, blocks
+        # inefficient
+        buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
+                           np.uint8 )
+        csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
+        return buffer[:csize].copy(), dset.shape, dset.dtype        
 
 def get_frames_h5py( h5name, dset ):
     with h5py.File(h5name, "r") as h5f:
@@ -40,9 +33,25 @@ def get_chunks( h5name, dset ):
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
+        # inefficient
+        buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
+                           np.uint8 ) 
         for frame in range(dset.shape[0]):
-            yield dset.id.read_direct_chunk( (frame, 0, 0) ), (dset.shape[1], dset.shape[2]), dset.dtype
+            csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
+            yield buffer[:csize], dset.shape, dset.dtype
 
+            
+def get_blocks( chunk, shape, dtyp ):
+    # We do this in python as it doesn't seem worth making a call back
+    # ... otherwise need to learn to call free on a numpy array 
+    total_bytes, blocksize = struct.unpack_from("!QL", chunk, 0)
+    if blocksize == 0:
+        blocksize = 8192
+    nblocks =  (total_bytes + blocksize - 1) // blocksize
+    blocks = np.empty( nblocks, np.uint32 )
+    bslz4decoders.read_starts( chunk, dtyp.itemsize, blocksize, blocks )
+    return blocksize, blocks    
+            
 def bench( func, *args ):
     start = timeit.default_timer()
     func(*args)
@@ -58,13 +67,21 @@ def benchiter( func, *args ):
 
 
 if __name__=="__main__":
-    hname = "bslz4testcases.h5"
-    get_chunk( hname, 'data_uint8', 0 )
+    import sys
+    if len(sys.argv) == 1:
+        hname = "bslz4testcases.h5"
+        dsets = [ "data_uint%d"%(i) for i in (8,16,32) ]
+    else:
+        hname = sys.argv[1]
+        dsets = [ d for d in sys.argv[2:] ]
     import timeit, sys
-    for s in [8,16,32]:
+    for hname, d in testcases:
         print()
-        bench( get_frame_h5py, "bslz4testcases.h5", "data_uint%d"%(s), 0 )
-        benchiter( get_frames_h5py, "bslz4testcases.h5", "data_uint%d"%(s) )
-        bench( get_chunk, "bslz4testcases.h5", "data_uint%d"%(s), 0 )
-        benchiter( get_chunks, "bslz4testcases.h5", "data_uint%d"%(s) )
+        bench( get_chunk, hname, d, 0 )
+        bench( get_frame_h5py, hname, d, 0 )
+        benchiter( get_chunks, hname, d )
+        benchiter( get_frames_h5py, hname, d )
 
+        chunk, shape, dtyp = get_chunk( hname, d, 0 )
+        bench( get_blocks, chunk, shape, dtyp )
+            

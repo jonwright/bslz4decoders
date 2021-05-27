@@ -4,6 +4,18 @@ python module bslz4decoders
 interface
         
 
+function h5_read_direct(dataset_id,frame,chunk,chunk_length)
+intent(c) h5_read_direct
+intent(c)
+integer(kind=8) :: dataset_id
+integer :: frame
+integer(kind=1) , intent(inout) , dimension( chunk_length):: chunk
+integer , intent( hide ), depend( chunk ) :: chunk_length
+integer :: h5_read_direct
+end function h5_read_direct
+
+
+
 function omp_lz4(compressed,compressed_length,itemsize,output,output_length)
 intent(c) omp_lz4
 intent(c)

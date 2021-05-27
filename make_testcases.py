@@ -12,7 +12,7 @@ def write_array( h5name, dsetname, ary ):
 
 def make_testcases( ):
     hname = "bslz4testcases.h5"
-    shp = (6, 123, 457)  # with awkward shape
+    shp = (6, 1237, 4571)  # with awkward shape
     nelem = np.prod(shp)
     for dtyp, label in ( ( np.uint8, 'data_uint8' ),
                          ( np.uint16, 'data_uint16' ),
