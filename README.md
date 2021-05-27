@@ -12,7 +12,12 @@ Jon Wright, 2021
   git clone https://github.com/jonwright/bslz4encoders
   git submodule init
   git submodule update
+  cd bitshuffle
+  git apply ../bitshuffle.src.bitshuffle_core.patch
+
+  make
   # python codegen.py bslz4decoders
   # CFLAGS="-fopenmp" f2py -c bslz4decoders.pyf bslz4decoders.c -llz4
-  make
+
+  make test
 ```

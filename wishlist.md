@@ -1,7 +1,10 @@
 
 A repository with various tests for reading bslz4 data.
 
-Things that will be nice to have:
+Things that could be nice to have:
+- reading an ROI from the middle of an image
+- faster reading
+- faster sparsification
 
 test datasets
 - basler id11, different roi
