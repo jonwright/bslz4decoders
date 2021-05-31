@@ -2,16 +2,16 @@
 
 import subprocess, tempfile, os, time, sys
 
-# C-code generic header things and function writers ... 
+# C-code generic header things and function writers ...
 
 FUNCS = {}
 
 INCLUDES = """
 /* A curated collection of different BSLZ4 readers
    This is automatically generated code
-   Edit this to change the original : 
+   Edit this to change the original :
      %s
-   Created on : 
+   Created on :
      %s
    Code generator written by Jon Wright.
 */
@@ -21,7 +21,7 @@ INCLUDES = """
 #include <string.h>   /* memcpy */
 #include <stdio.h>    /* print error message before killing process(!?!?) */
 #include <lz4.h>      /* assumes you have this already */
-#include <hdf5.h>     /* to grab chunks independently of h5py api (py27 issue) */ 
+#include <hdf5.h>     /* to grab chunks independently of h5py api (py27 issue) */
 
 #ifdef USEIPP
 #include <ippdc.h>    /* for intel ... going to need a platform build system */
@@ -45,7 +45,7 @@ MACROS = """
     (uint64_t)(255 & (p)[5]) << 16 |\\
     (uint64_t)(255 & (p)[6]) <<  8 |\\
     (uint64_t)(255 & (p)[7])       )
-    
+
 #define ERRVAL -1
 
 #define ERR(s) \\
@@ -57,7 +57,7 @@ MACROS = """
 
 class compiler:
     def compile(self, cname, oname):
-        ret = subprocess.run( " ".join([self.CC,] + self.CFLAGS + 
+        ret = subprocess.run( " ".join([self.CC,] + self.CFLAGS +
                              ["-c", cname,"-o", oname]),
                                   shell = True, capture_output=True )
         return ret
@@ -79,7 +79,7 @@ class ICC(compiler):
     CFLAGS = ['-qopenmp', '-O2', '-Wall' ]
 
 class cfrag:
-    """ A fragment of C code to insert. May have a defer to 
+    """ A fragment of C code to insert. May have a defer to
     put at the end of a logical block """
     def __init__(self, fragment, defer=None):
         self.fragment = fragment
@@ -93,8 +93,8 @@ TMAP = {
     'uint16_t': 'integer(kind=-2)',
     'uint32_t': 'integer(kind=-4)',
     'uint64_t': 'integer(kind=-8)',
-    'int': 'integer', # doubtful 
-    'size_t': 'integer', # surely wrong
+    'int': 'integer(kind=4)', # doubtful
+    'size_t': 'integer(kind=8)', # surely wrong
 }
 
 class cfunc:
@@ -143,7 +143,7 @@ class cfunc:
                     intent = 'intent(in)'
                 else:
                     intent = 'intent(inout)'
-                dim = "dimension( %s_length)"%(a)        
+                dim = "dimension( %s_length)"%(a)
                 decl = ' , '.join( (TMAP[m], intent, dim ))
                 decl += ":: %s"%( a )
             elif a.endswith('_length'):
@@ -159,7 +159,7 @@ class cfunc:
             lines.append( TMAP[ftype] + " :: " + fname )
             lines.append( "end function %s"%(fname) )
         return lines +["\n"]
-                
+
     def testcompile(self, cc=GCC() ):
         with tempfile.NamedTemporaryFile( mode = 'w', suffix = '.c', dir=os.getcwd() ) as tmp:
             tmp.write( INCLUDES )
@@ -209,9 +209,11 @@ blocklist_args = chunk_args +  [ "int blocksize", "uint32_t * blocks", "int bloc
 
 chunkdecoder = cfragments(
 # To convert an input to get the block start positions
-chunks_2_blocks = cfrag( """
+total_length = cfrag( """
    size_t total_output_length;
    total_output_length = READ64BE( compressed );
+   """),
+read_blocksize = cfrag( """
    int blocksize;
    blocksize = (int) READ32BE( (compressed+8) );
    if (blocksize == 0) { blocksize = 8192; }
@@ -244,12 +246,14 @@ print_starts = cfrag( """
    printf("blocks_length %d\\n", blocks_length);
    for( int i = 0; i < blocks_length ; i++ )
        printf("%d %d, ", i, blocks[i]);
+   printf("About to free and return\\n");
 """ ),
 ) #### end of chunkdecoder
 
 
-FUNCS['print_offsets_func'] = cfunc( "int print_offsets", chunk_args, 
-                    chunkdecoder( "chunks_2_blocks", "blocks_length" , "create_starts",
+FUNCS['print_offsets_func'] = cfunc( "int print_offsets", chunk_args,
+                    chunkdecoder( "total_length","read_blocksize" ,
+                    "blocks_length" , "create_starts",
                             "read_starts" , "print_starts" ) )
 
 FUNCS['read_starts_func'] = cfunc( "int read_starts",
@@ -279,16 +283,16 @@ lz4decoders = cfragments(
     if (error) ERR("Error decoding LZ4");
     /* last block, might not be full blocksize */
     {
-      int lastblock = (int) output_length - blocksize * (blocks_length - 1);
+      int lastblock = (int) total_output_length - blocksize * (blocks_length - 1);
       /* last few bytes are copied flat */
       int copied = lastblock % ( 8 * itemsize );
       lastblock -= copied;
-      memcpy( &output[ output_length - (size_t) copied ], 
+      memcpy( &output[ total_output_length - (size_t) copied ],
               &compressed[ compressed_length - (size_t) copied ], (size_t) copied );
       int nbytes = (int) READ32BE( compressed + blocks[blocks_length - 1]);
 #ifdef USEIPP
       int bsize = lastblock;
-      IppStatus ret = ippsDecodeLZ4_8u( &compressed[ blocks[blocks_length-1] + 4u], 
+      IppStatus ret = ippsDecodeLZ4_8u( &compressed[ blocks[blocks_length-1] + 4u],
                                         (int) READ32BE( compressed + blocks[blocks_length-1] ),
                                          &output[(blocks_length-1) * blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
@@ -321,11 +325,11 @@ lz4decoders = cfragments(
     }
     /* last block, might not be full blocksize */
     {
-      int lastblock = (int) output_length - blocksize * (blocks_length - 1);
+      int lastblock = (int) total_output_length - blocksize * (blocks_length - 1);
       /* last few bytes are copied flat */
       int copied = lastblock % ( 8 * itemsize );
       lastblock -= copied;
-      memcpy( &output[ output_length - (size_t) copied ], 
+      memcpy( &output[ total_output_length - (size_t) copied ],
               &compressed[ compressed_length - (size_t) copied ], (size_t) copied );
 
       int nbytes = (int) READ32BE( &compressed[p] );
@@ -346,16 +350,16 @@ lz4decoders = cfragments(
 )
 
 
-FUNCS['onecore_lz4_func'] = cfunc( "int onecore_lz4", chunk_args + output_args, 
+FUNCS['onecore_lz4_func'] = cfunc( "int onecore_lz4", chunk_args + output_args,
              (chunkdecoder+lz4decoders)(
-                 "chunks_2_blocks", "blocks_length", "onecore_lz4") )
+                 "total_length","read_blocksize" , "blocks_length", "onecore_lz4") )
 
-FUNCS['omp_lz4_make_starts_func'] = cfunc( "int omp_lz4", chunk_args + output_args, 
-             (chunkdecoder+lz4decoders)( "chunks_2_blocks", "blocks_length" , 
-             "create_starts", "read_starts" , "omp_lz4" ) ) 
+FUNCS['omp_lz4_make_starts_func'] = cfunc( "int omp_lz4", chunk_args + output_args,
+             (chunkdecoder+lz4decoders)( "total_length","read_blocksize" ,  "blocks_length" ,
+             "create_starts", "read_starts" , "omp_lz4" ) )
 
-FUNCS['omp_lz4_with_starts_func'] = cfunc( "int omp_lz4_blocks", blocklist_args + output_args, 
-             lz4decoders( "omp_lz4" ) ) 
+FUNCS['omp_lz4_with_starts_func'] = cfunc( "int omp_lz4_blocks", blocklist_args + output_args,
+             (chunkdecoder+lz4decoders)( "total_length" ,"omp_lz4" ) )
 
 FUNCS['h5_read_direct'] = cfunc("size_t h5_read_direct", # name, args, body
                                 # hid_t is int64_t (today, somwhere)
@@ -363,8 +367,8 @@ FUNCS['h5_read_direct'] = cfunc("size_t h5_read_direct", # name, args, body
                ["int64_t dataset_id", "int frame", "char * chunk", "size_t chunk_length" ],
                                 """
 {
-/* see: 
-   https://support.hdfgroup.org/HDF5/doc/HL/RM_HDF5Optimized.html#H5DOread_chunk 
+/* see:
+   https://support.hdfgroup.org/HDF5/doc/HL/RM_HDF5Optimized.html#H5DOread_chunk
 
    ... assuming this is h5py.dataset.id.id :
     hid_t dataset;
@@ -388,7 +392,7 @@ FUNCS['h5_read_direct'] = cfunc("size_t h5_read_direct", # name, args, body
         fprintf(stderr,"Problem getting storage size for the chunk");
         return 0;
         }
-    /* Use H5DOread_chunk() to read the chunk back 
+    /* Use H5DOread_chunk() to read the chunk back
        ... becomes H5Dread_chunk in later library versions */
     uint32_t read_filter_mask;
     ret = H5Dread_chunk(dataset_id, H5P_DEFAULT, offset, &read_filter_mask, chunk);
@@ -397,10 +401,10 @@ FUNCS['h5_read_direct'] = cfunc("size_t h5_read_direct", # name, args, body
         return 0;
         }
     if ( read_filter_mask != 0 ){
-        fprintf(stderr, "chunk was filtered"); 
+        fprintf(stderr, "chunk was filtered");
         return 0;
      }
-    return chunk_nbytes; 
+    return chunk_nbytes;
 }
 """)
 
@@ -444,6 +448,7 @@ if __name__=="__main__":
     f2pyfile = sys.argv[1]
     write_pyf(f2pyfile , cfile, FUNCS )
     write_funcs( cfile, FUNCS )
+    sys.exit()
     test_funcs_compile()
     for compiler in GCC(), CLANG():
         print(compiler.CC, compiler.CFLAGS)
