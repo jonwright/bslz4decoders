@@ -71,7 +71,7 @@ constexpr const int DECOMP_THREADS_PER_CHUNK = 32;
 /**
  * @brief The number of chunks to decompression concurrently per threadblock.
  */
-constexpr const int DECOMP_CHUNKS_PER_BLOCK = 2;
+constexpr const int DECOMP_CHUNKS_PER_BLOCK = 2; // better as 2. Not sure why
 
 /**
  * @brief The size of the shared memory buffer to use per decompression stream.
@@ -464,25 +464,26 @@ inline __device__ uint32_t read32be( const uint8_t* address )
              (uint32_t)(255 & (address)[2]) <<  8 |(uint32_t)(255 & (address)[3])       ) ;
 }
 
-__global__ void lz4DecompressBatchKernel_forbitshuffle(
+__global__ void lz4dc_forBSLZ4 (
     const uint8_t* const device_in_ptr,    /* compressed start block pointer */
     const uint32_t* const device_in_pos,      /* data starts */
     const uint32_t batch_size,                   /* number of blocks */
     const uint32_t blocksize,                    /* blocksize */
-    uint8_t* const device_out_ptr)  /* destination start pointer */
+    uint8_t* const device_out_ptr,        /* destination start pointer */
+    const uint32_t copies,                 /* bytes to copy at the end */
+    const uint32_t copystart
+    )
 {
 
   const int bid = blockIdx.x * blockDim.y + threadIdx.y;
-
+  // threadIdx.x is 0->31 for parallel copies
 
   __shared__ uint8_t buffer[DECOMP_INPUT_BUFFER_SIZE * DECOMP_CHUNKS_PER_BLOCK];
+
   if (bid < batch_size) {
 
     size_t offset = device_in_pos[bid];
-    const position_type chunk_length = read32be( device_in_ptr+offset );
-/*    if (threadIdx.x == 0){
-     printf("I am bid %d %d %d\\n",  bid, blockIdx.x, threadIdx.y);
-    } */
+    const position_type chunk_length = read32be( device_in_ptr + offset );
     uint8_t* const decomp_ptr = device_out_ptr + bid * blocksize;
     const uint8_t* const comp_ptr = device_in_ptr + offset + 4;
 
@@ -491,57 +492,152 @@ __global__ void lz4DecompressBatchKernel_forbitshuffle(
         decomp_ptr,
         comp_ptr,
         chunk_length);
+
+    /* remaining bytes at the end of the stream. One per thread.
+       These should always be less than or equal to 32 == 4(bytes) * 8(bits)
+    */
+    if ( bid == (batch_size-1) && threadIdx.x < copies && threadIdx.y == 0 ){
+        uint8_t * dest = device_out_ptr + copystart + threadIdx.x;
+        const uint8_t * src = comp_ptr + chunk_length + threadIdx.x;
+        *dest = *src;
+    }
+  }
+}
+
+
+__global__ void simple_shuffle(const uint8_t * __restrict__ in, uint8_t * __restrict__ out,
+                          const uint32_t blocksize, const uint32_t total_bytes, const uint32_t elemsize ) {
+
+  //                 0-32                        32
+  uint32_t dest = threadIdx.x + blockIdx.x * blockDim.x;      // where to write output
+
+  // first input byte :  bytes_per_elem==4
+  uint32_t block_id = (dest * elemsize) / blocksize;             // which block is this block ?
+  uint32_t block_start = block_id * blocksize;                   // where did the block start ?
+  uint32_t nblocks = total_bytes / blocksize;                    // rounds down
+  uint32_t bsize = blocksize;
+  uint32_t tocopy = 0;
+  uint32_t elements_in_block = bsize / elemsize;
+  uint32_t position_in_block = dest % elements_in_block;         // 0 -> 2048
+  int loop = 1;
+  if( block_id == nblocks ) {                                    // this nmight not be a full length block.
+     bsize = total_bytes % blocksize;
+     tocopy = bsize % ( 8 * elemsize);
+     bsize -= tocopy;
+     elements_in_block = bsize / elemsize;
+     if( position_in_block >= elements_in_block ){
+         // this is a copy
+         for( int i = 0 ; i < elemsize ; i++ ){
+             out[ dest * elemsize + i ] = in[ dest * elemsize + i ];
+         }
+         loop = 0;
+     } else  {
+         position_in_block = position_in_block % elements_in_block;
+     }
+  }
+  if (loop && block_id <= nblocks) {
+     const uint8_t * mybyte = in + block_start + ( position_in_block / 8 );
+     uint8_t mymask = 1U << (position_in_block % 8);
+     uint32_t bytestride = bsize / ( 8 * elemsize );
+
+     uint32_t myval = 0;
+     for( int i = 0 ; i < elemsize*8 ; i ++ ) {       // grab my bits
+        if( (*mybyte & mymask) > 0 ) {
+            myval = myval | (1U << i);
+        }
+        mybyte = mybyte + bytestride;
+     }
+     for( int i = 0; i<elemsize ; i++){
+         out[dest * elemsize + i] = (uint8_t) ((myval)>>(8*i));
+         }
   }
 }
 """
 
 
-import read_chunks
+
+
+class BSLZ4CUDA:
+    def __init__(self, total_output_bytes ):
+        """ cache / reuse memory """
+        self.total_output_bytes = total_output_bytes
+        self.mod = SourceModule( modsrc )
+        self.lz4dc_forBSLZ4 = self.mod.get_function("lz4dc_forBSLZ4")
+        self.simple_shuffle = self.mod.get_function("simple_shuffle")
+        self.output_d = drv.mem_alloc( total_output_bytes ) # holds the lz4 decompressed, still shuffled data
+        self.shuf_d =   drv.mem_alloc( total_output_bytes ) # holds the final unshuffled data
+
+    def __call__(self, chunk, shape, dtyp, blocksize, blocks, out=None ):
+        bpp = dtyp.itemsize
+        if out is not None:
+            total_output_bytes = shape[0]*shape[1]*dtyp.itemsize
+            output = np.empty( total_output_bytes, np.uint8 )
+        else:
+            output = out.ravel().view( np.uint8 )
+        # LZ4 blocking :
+        # a single block is 32 threads and this handles 2 chunks
+        lz4block = (32,2,1)
+        lz4grid = ((len(blocks)+2)//2,1,1)
+        copies  = ( self.total_output_bytes % ( bpp * 8 ) )
+        copystart = self.total_output_bytes - copies
+        # shuffle blocking:
+        shblock = (32,1,1)   # no good reason. Was told 32 in a warp.
+        shgrid  = ((output.nbytes + 31) // 32, 1, 1) # Going to be wrong for 16 bits ?
+        self.chunk_d = drv.mem_alloc( chunk.nbytes )        # the compressed data
+        self.blocks_d = drv.mem_alloc( blocks.nbytes )      # 32 bit offsets into the compressed for blocks
+
+        # drv.memcpy_htod( chunk_d, chunk )         # compressed data on the device
+        # drv.memcpy_htod( blocks_d, blocks )
+        self.lz4dc_forBSLZ4( drv.In( chunk  ),
+                             drv.In( blocks ),
+                             np.int32(len(blocks)),
+                             np.int32(blocksize),
+                             self.output_d,
+                             np.int32(copies),               # todo : move the copy to directly go to output ?
+                             np.int32(copystart),
+                            block=lz4block, grid=lz4grid)
+
+        self.simple_shuffle( self.output_d, self.shuf_d, np.uint32( blocksize ),
+                            np.uint32( ref.nbytes ), np.uint32( ref.itemsize ),
+                            block = shblock, grid = shgrid )
+        # last block
+        drv.memcpy_dtoh( output,  self.shuf_d )
+        return output.view( dtyp ).reshape( shape )
+
+
+import read_chunks, timeit
 hname = "bslz4testcases.h5"
 dset  = "data_uint32"
-chunk, shape, dtyp  = read_chunks.get_chunk( hname, dset, 0 )
+
 ref = h5py.File( hname )[dset][0]
+
+chunk, shape, dtyp  = read_chunks.get_chunk( hname, dset, 0 )
+total_output_elem  = shape[1]*shape[2]
+total_output_bytes = total_output_elem*dtyp.itemsize
+assert total_output_bytes == ref.nbytes
+assert total_output_elem == ref.size
 blocksize, blocks = read_chunks.get_blocks( chunk, shape, dtyp )
-output = np.zeros( shape[1]*shape[2], dtype = dtyp ).view(np.uint8)
-#print(shape, dtyp, len(chunk), blocksize, len(blocks))
-#print(blocks)
+output = np.empty( total_output_elem, dtyp )
+
+start = timeit.default_timer()
+decompressor = BSLZ4CUDA( total_output_bytes )
+now   = timeit.default_timer()
+print( "Create cuda thing",  now-start )
+
+start = timeit.default_timer()
+decomp = decompressor( chunk, (shape[1],shape[2]), dtyp, blocksize, blocks, out=output )
+now = timeit.default_timer()
+dt = now - start
+print( "Call cuda thing %.3f ms, %.3f GB/s (metric)" % ( dt * 1000, decomp.nbytes / dt / 1e9 ) )
+print( "total bytes = %d"%(decomp.nbytes))
 
 
-if 1:
-    with open("ksrc.cu","w") as f:
-        f.write( modsrc )
-    mod = SourceModule( modsrc )
-    start=drv.Event()
-    end=drv.Event()
-    transf=drv.Event()
-    chunk_d = drv.mem_alloc( chunk.nbytes )
-    drv.memcpy_htod( chunk_d, chunk )
-    blocks_d = drv.mem_alloc( blocks.nbytes ) # assume 8 bytes per pointer.
-    drv.memcpy_htod( blocks_d, blocks )
-    output_d = drv.mem_alloc( output.nbytes )
-
-    # a single block is 32 threads
-    # chunks per block is 2
-    block = (32,2,1)
-    grid = ((len(blocks)+1)//2,1,1)  # all the threads in total?
-    dc = mod.get_function("lz4DecompressBatchKernel_forbitshuffle")
-    start.record()
-    dc( chunk_d, blocks_d, np.int32(len(blocks)), np.int32(blocksize), output_d,
-        block=block, grid=grid)
-    end.record()
-    end.synchronize()
-    drv.memcpy_dtoh( output,  output_d )
-    transf.record()
-    transf.synchronize()
-    print("Back to python now millis calc, transfer", start.time_till(end), end.time_till(transf))
-flatcopy =ref.ravel().nbytes%(8*ref.itemsize)
-output[-flatcopy:] = chunk[-flatcopy:]
-decomp = bitshuffle.bitunshuffle( output.view( ref.dtype ) ).reshape(ref.shape)
 if (ref==decomp).all():
     print("Test passes!!!")
 else:
+    print("FAILS!!!")
     print("decomp:")
-    print(decomp)
+    print(decomp.ravel()[:128])
     print("ref:")
     print(ref)
     err = abs(ref-decomp).ravel()
@@ -550,5 +646,7 @@ else:
     print(ref.ravel()[-10:])
     print(decomp.ravel()[-10:])
     import pylab as pl
-    pl.imshow(decomp,aspect='auto',interpolation='nearest')
+    pl.imshow(ref,aspect='auto',interpolation='nearest')
+    pl.figure()
+    pl.imshow(output.view( ref.dtype ).reshape(ref.shape) - ref, aspect='auto', interpolation='nearest')
     pl.show()
