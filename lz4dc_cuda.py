@@ -609,7 +609,7 @@ import read_chunks, timeit
 hname = "bslz4testcases.h5"
 dset  = "data_uint32"
 
-ref = h5py.File( hname )[dset][0]
+ref = h5py.File( hname, 'r' )[dset][0]
 
 chunk, shape, dtyp  = read_chunks.get_chunk( hname, dset, 0 )
 total_output_elem  = shape[1]*shape[2]

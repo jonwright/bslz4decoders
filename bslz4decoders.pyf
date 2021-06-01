@@ -8,10 +8,10 @@ function h5_read_direct(dataset_id,frame,chunk,chunk_length)
 intent(c) h5_read_direct
 intent(c)
 integer(kind=8) :: dataset_id
-integer :: frame
+integer(kind=4) :: frame
 integer(kind=1) , intent(inout) , dimension( chunk_length):: chunk
-integer , intent( hide ), depend( chunk ) :: chunk_length
-integer :: h5_read_direct
+integer(kind=8) , intent( hide ), depend( chunk ) :: chunk_length
+integer(kind=8) :: h5_read_direct
 end function h5_read_direct
 
 
@@ -20,11 +20,11 @@ function omp_lz4(compressed,compressed_length,itemsize,output,output_length)
 intent(c) omp_lz4
 intent(c)
 integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
-integer , intent( hide ), depend( compressed ) :: compressed_length
-integer :: itemsize
+integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
+integer(kind=4) :: itemsize
 integer(kind=1) , intent(inout) , dimension( output_length):: output
-integer , intent( hide ), depend( output ) :: output_length
-integer :: omp_lz4
+integer(kind=8) , intent( hide ), depend( output ) :: output_length
+integer(kind=4) :: omp_lz4
 end function omp_lz4
 
 
@@ -33,14 +33,14 @@ function omp_lz4_blocks(compressed,compressed_length,itemsize,blocksize,blocks,b
 intent(c) omp_lz4_blocks
 intent(c)
 integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
-integer , intent( hide ), depend( compressed ) :: compressed_length
-integer :: itemsize
-integer :: blocksize
+integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
+integer(kind=4) :: itemsize
+integer(kind=4) :: blocksize
 integer(kind=-4) , intent(inout) , dimension( blocks_length):: blocks
-integer , intent( hide ), depend( blocks ) :: blocks_length
+integer(kind=4) , intent( hide ), depend( blocks ) :: blocks_length
 integer(kind=1) , intent(inout) , dimension( output_length):: output
-integer , intent( hide ), depend( output ) :: output_length
-integer :: omp_lz4_blocks
+integer(kind=8) , intent( hide ), depend( output ) :: output_length
+integer(kind=4) :: omp_lz4_blocks
 end function omp_lz4_blocks
 
 
@@ -49,11 +49,11 @@ function onecore_lz4(compressed,compressed_length,itemsize,output,output_length)
 intent(c) onecore_lz4
 intent(c)
 integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
-integer , intent( hide ), depend( compressed ) :: compressed_length
-integer :: itemsize
+integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
+integer(kind=4) :: itemsize
 integer(kind=1) , intent(inout) , dimension( output_length):: output
-integer , intent( hide ), depend( output ) :: output_length
-integer :: onecore_lz4
+integer(kind=8) , intent( hide ), depend( output ) :: output_length
+integer(kind=4) :: onecore_lz4
 end function onecore_lz4
 
 
@@ -62,9 +62,9 @@ function print_offsets(compressed,compressed_length,itemsize)
 intent(c) print_offsets
 intent(c)
 integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
-integer , intent( hide ), depend( compressed ) :: compressed_length
-integer :: itemsize
-integer :: print_offsets
+integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
+integer(kind=4) :: itemsize
+integer(kind=4) :: print_offsets
 end function print_offsets
 
 
@@ -73,12 +73,12 @@ function read_starts(compressed,compressed_length,itemsize,blocksize,blocks,bloc
 intent(c) read_starts
 intent(c)
 integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
-integer , intent( hide ), depend( compressed ) :: compressed_length
-integer :: itemsize
-integer :: blocksize
+integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
+integer(kind=4) :: itemsize
+integer(kind=4) :: blocksize
 integer(kind=-4) , intent(inout) , dimension( blocks_length):: blocks
-integer , intent( hide ), depend( blocks ) :: blocks_length
-integer :: read_starts
+integer(kind=4) , intent( hide ), depend( blocks ) :: blocks_length
+integer(kind=4) :: read_starts
 end function read_starts
 
 end interface

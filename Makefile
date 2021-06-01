@@ -21,8 +21,11 @@
 #	-L/data/id11/jon/conda_x86_64/envs/hdf5bench/lib \
 #	-llz4 -lippdc -lippcore -lhdf5
 
-bslz4decoders.cpython-39-aarch64-linux-gnu.so: bslz4decoders.c bslz4decoders.pyf
-	CFLAGS="-fopenmp" f2py -c bslz4decoders.pyf bslz4decoders.c -llz4 -lhdf5
+
+
+
+bslz4decoders.so: bslz4decoders.c bslz4decoders.pyf
+	CFLAGS='-fopenmp -march=native -std=c99' python -m numpy.f2py -c bslz4decoders.pyf bslz4decoders.c -I$CONDA_PREFIX/include -L$CONDA_PREFIX/lib -lhdf5 -llz4
 
 bslz4decoders.pyf: codegen.py
 	python codegen.py bslz4decoders
@@ -34,7 +37,7 @@ bslz4testcases.h5: make_testcases.py
 	rm bslz4testcases.h5
 	python make_testcases.py
 
-test: bslz4testcases.h5 testcases.py
+test: bslz4testcases.h5 testcases.py 
 	py.test --ignore=bitshuffle
 	python bench_read.py
 	python test_decoders.py

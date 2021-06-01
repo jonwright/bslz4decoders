@@ -65,6 +65,15 @@ class compiler:
 UFL = "-Wmissing-prototypes -Wshadow -Wconversion"
 UFL = "-std=c99 -fopenmp -Wall -Wall -Wstrict-prototypes -Wshadow -Wmissing-prototypes -Wconversion".split()
 
+import os
+if "CONDA_PREFIX" in os.environ:
+    UFL.append( "-I%s/include"%(os.environ['CONDA_PREFIX']) )
+else:
+    for p in ("/usr/include/hdf5/serial",):
+        if os.path.exists( os.path.join(p, 'hdf5.h') ):
+            UFL.append( "-I%s"%(p) )
+            break
+
 class GCC(compiler):
     CC = 'gcc'
     CFLAGS = UFL + [ '-O2', '-fsanitize=undefined']
@@ -448,7 +457,8 @@ if __name__=="__main__":
     f2pyfile = sys.argv[1]
     write_pyf(f2pyfile , cfile, FUNCS )
     write_funcs( cfile, FUNCS )
-    sys.exit()
+    if len(sys.argv)==2:
+        sys.exit()
     test_funcs_compile()
     for compiler in GCC(), CLANG():
         print(compiler.CC, compiler.CFLAGS)

@@ -2,9 +2,9 @@
 /* A curated collection of different BSLZ4 readers
    This is automatically generated code
    Edit this to change the original :
-     /home/jon/Documents/bslz4_codecs/codegen.py
+     codegen.py
    Created on :
-     Thu May 27 21:03:42 2021
+     Tue Jun  1 21:34:27 2021
    Code generator written by Jon Wright.
 */
 
@@ -100,17 +100,21 @@ size_t h5_read_direct(int64_t dataset_id, int frame, char *chunk,
 } /* Definition for omp_lz4_make_starts_func */
 int omp_lz4(const char *compressed, size_t compressed_length, int itemsize,
             char *output, size_t output_length) {
-  /* begin: chunks_2_blocks */
+  /* begin: total_length */
 
   size_t total_output_length;
   total_output_length = READ64BE(compressed);
+
+  /* ends: total_length */
+  /* begin: read_blocksize */
+
   int blocksize;
   blocksize = (int)READ32BE((compressed + 8));
   if (blocksize == 0) {
     blocksize = 8192;
   }
 
-  /* ends: chunks_2_blocks */
+  /* ends: read_blocksize */
   /* begin: blocks_length */
 
   int blocks_length;
@@ -163,11 +167,11 @@ int omp_lz4(const char *compressed, size_t compressed_length, int itemsize,
     ERR("Error decoding LZ4");
   /* last block, might not be full blocksize */
   {
-    int lastblock = (int)output_length - blocksize * (blocks_length - 1);
+    int lastblock = (int)total_output_length - blocksize * (blocks_length - 1);
     /* last few bytes are copied flat */
     int copied = lastblock % (8 * itemsize);
     lastblock -= copied;
-    memcpy(&output[output_length - (size_t)copied],
+    memcpy(&output[total_output_length - (size_t)copied],
            &compressed[compressed_length - (size_t)copied], (size_t)copied);
     int nbytes = (int)READ32BE(compressed + blocks[blocks_length - 1]);
 #ifdef USEIPP
@@ -197,6 +201,12 @@ int omp_lz4(const char *compressed, size_t compressed_length, int itemsize,
 int omp_lz4_blocks(const char *compressed, size_t compressed_length,
                    int itemsize, int blocksize, uint32_t *blocks,
                    int blocks_length, char *output, size_t output_length) {
+  /* begin: total_length */
+
+  size_t total_output_length;
+  total_output_length = READ64BE(compressed);
+
+  /* ends: total_length */
   /* begin: omp_lz4 */
 
   int error = 0;
@@ -221,11 +231,11 @@ int omp_lz4_blocks(const char *compressed, size_t compressed_length,
     ERR("Error decoding LZ4");
   /* last block, might not be full blocksize */
   {
-    int lastblock = (int)output_length - blocksize * (blocks_length - 1);
+    int lastblock = (int)total_output_length - blocksize * (blocks_length - 1);
     /* last few bytes are copied flat */
     int copied = lastblock % (8 * itemsize);
     lastblock -= copied;
-    memcpy(&output[output_length - (size_t)copied],
+    memcpy(&output[total_output_length - (size_t)copied],
            &compressed[compressed_length - (size_t)copied], (size_t)copied);
     int nbytes = (int)READ32BE(compressed + blocks[blocks_length - 1]);
 #ifdef USEIPP
@@ -251,17 +261,21 @@ int omp_lz4_blocks(const char *compressed, size_t compressed_length,
 /* Definition for onecore_lz4_func */
 int onecore_lz4(const char *compressed, size_t compressed_length, int itemsize,
                 char *output, size_t output_length) {
-  /* begin: chunks_2_blocks */
+  /* begin: total_length */
 
   size_t total_output_length;
   total_output_length = READ64BE(compressed);
+
+  /* ends: total_length */
+  /* begin: read_blocksize */
+
   int blocksize;
   blocksize = (int)READ32BE((compressed + 8));
   if (blocksize == 0) {
     blocksize = 8192;
   }
 
-  /* ends: chunks_2_blocks */
+  /* ends: read_blocksize */
   /* begin: blocks_length */
 
   int blocks_length;
@@ -289,11 +303,11 @@ int onecore_lz4(const char *compressed, size_t compressed_length, int itemsize,
   }
   /* last block, might not be full blocksize */
   {
-    int lastblock = (int)output_length - blocksize * (blocks_length - 1);
+    int lastblock = (int)total_output_length - blocksize * (blocks_length - 1);
     /* last few bytes are copied flat */
     int copied = lastblock % (8 * itemsize);
     lastblock -= copied;
-    memcpy(&output[output_length - (size_t)copied],
+    memcpy(&output[total_output_length - (size_t)copied],
            &compressed[compressed_length - (size_t)copied], (size_t)copied);
 
     int nbytes = (int)READ32BE(&compressed[p]);
@@ -319,17 +333,21 @@ int onecore_lz4(const char *compressed, size_t compressed_length, int itemsize,
 /* Definition for print_offsets_func */
 int print_offsets(const char *compressed, size_t compressed_length,
                   int itemsize) {
-  /* begin: chunks_2_blocks */
+  /* begin: total_length */
 
   size_t total_output_length;
   total_output_length = READ64BE(compressed);
+
+  /* ends: total_length */
+  /* begin: read_blocksize */
+
   int blocksize;
   blocksize = (int)READ32BE((compressed + 8));
   if (blocksize == 0) {
     blocksize = 8192;
   }
 
-  /* ends: chunks_2_blocks */
+  /* ends: read_blocksize */
   /* begin: blocks_length */
 
   int blocks_length;
@@ -364,6 +382,7 @@ int print_offsets(const char *compressed, size_t compressed_length,
   printf("blocks_length %d\n", blocks_length);
   for (int i = 0; i < blocks_length; i++)
     printf("%d %d, ", i, blocks[i]);
+  printf("About to free and return\n");
 
   /* ends: print_starts */
   /* begin: create_starts */
