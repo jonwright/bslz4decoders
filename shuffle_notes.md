@@ -1,3 +1,12 @@
+One strange thing, transpose != untranpose. How is that:
+
+ - usual block size is 8192 bytes
+ - this is either (1024,8) or (2048,4) or (4096,2) or (8192,1) elements
+ - the transpose is of the whole block
+ - Case of (2048,4) -> (4, 2048)...
+ - ... The first 2048 bits (==256 bytes), (==64 uint32) are the first bit of each output
+ - Case of (4092, 2) -> (2, 4096)...
+ - ... The first 4096 bits (==512 bytes), (==256 uint16) are the first bit of each output
 
 
 bshuf_untrans_bit_elem : undo the transpose
@@ -140,4 +149,4 @@ Also:
 
 https://github.com/dsnet/matrix-transpose/blob/master/matrix_transpose.c
 
-There is also code in hackers delight for 32x32 unrolled. One strange thing, transpose != untranpose. How is that.
+There is also code in hackers delight for 32x32 unrolled. 
