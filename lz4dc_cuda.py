@@ -2,13 +2,51 @@
 
 
 
-
+import timeit, sys
 import pycuda.autoinit
 import pycuda.driver as drv
 import pycuda
 import numpy as np, bitshuffle, hdf5plugin, h5py
-
 from pycuda.compiler import SourceModule
+
+try:
+    from sfdsadfsaread_chunks import get_chunk, get_blocks
+except:
+    print("You do not have read_chunk, using a h5py+numba version")
+    import numba, struct
+    assert sys.version_info[0] > 2 , "python2 was problematic for read_direct_chunk"
+    def get_chunk( hname, dset, frm):
+        """ get a bslz4 compressed chunk out of a file """
+        with h5py.File(hname,'r') as h:
+            ds = h[dset]
+            shape = ds.shape
+            dtyp = ds.dtype
+            # frame by fram chunks
+            assert ds.chunks == (1 , ds.shape[1], ds.shape[2] )
+            _, bits = ds.id.read_direct_chunk( (frm, 0, 0) )
+        chunk = np.frombuffer( bits, np.uint8 )
+        return chunk, shape, dtyp
+
+    @numba.njit
+    def read_blocks( chunk, blocks ):
+        """ Read the transposed block start positions from the chunk
+        First 4 bytes are the block length, the rest is the lz4 data
+        """
+        blocks[0] = 12
+        for j in range(1, len(blocks)):
+            i = blocks[j-1]
+            n = int((chunk[i] << 24) + (chunk[i+1] << 16) + (chunk[i+2] << 8) + chunk[i+3])
+            blocks[j] = i + n + 4
+
+    def get_blocks(chunk):
+        """ Get the block size and addresses out of the chunk"""
+        nbytes, blocksize = struct.unpack('!QL', chunk[:12])
+        if blocksize == 0:
+            blocksize = 8192
+        blocks = np.zeros( ( ( nbytes + blocksize - 1 ) // blocksize ), dtype = np.uint32 )
+        read_blocks( chunk, blocks )
+        return blocksize, blocks
+
 
 modsrc = """
 
@@ -598,55 +636,49 @@ class BSLZ4CUDA:
                             block=lz4block, grid=lz4grid)
 
         self.simple_shuffle( self.output_d, self.shuf_d, np.uint32( blocksize ),
-                            np.uint32( ref.nbytes ), np.uint32( ref.itemsize ),
+                            np.uint32( total_output_bytes ), np.uint32( bpp ),
                             block = shblock, grid = shgrid )
         # last block
         drv.memcpy_dtoh( output,  self.shuf_d )
         return output.view( dtyp ).reshape( shape )
 
+def testcase( hname, dset, frm):
+    print("Reading", hname, "::", dset, "[", frm, "]")
+    chunk, shape, dtyp  = get_chunk( hname, dset, frm )
+    total_output_elem  = shape[1]*shape[2]
+    total_output_bytes = total_output_elem*dtyp.itemsize
+    blocksize, blocks = get_blocks( chunk )
 
-import read_chunks, timeit
-hname = "bslz4testcases.h5"
-dset  = "data_uint32"
+    output = np.empty( total_output_elem, dtyp )
+    decompressor = BSLZ4CUDA( total_output_bytes )
+    decomp = decompressor( chunk, (shape[1],shape[2]), dtyp, blocksize, blocks, out=output )
 
-ref = h5py.File( hname, 'r' )[dset][0]
+    ref = h5py.File( hname, 'r' )[dset][frm]
 
-chunk, shape, dtyp  = read_chunks.get_chunk( hname, dset, 0 )
-total_output_elem  = shape[1]*shape[2]
-total_output_bytes = total_output_elem*dtyp.itemsize
-assert total_output_bytes == ref.nbytes
-assert total_output_elem == ref.size
-blocksize, blocks = read_chunks.get_blocks( chunk, shape, dtyp )
-output = np.empty( total_output_elem, dtyp )
+    if (ref==decomp).all():
+        print("Test passes!!!")
+    else:
+        print("FAILS!!!")
+        print("decomp:")
+        print(decomp.ravel()[:128])
+        print("ref:")
+        print(ref)
+        err = abs(ref-decomp).ravel()
+        ierr  = np.argmax( err)
+        print(ierr, decomp.ravel()[ierr], ref.ravel()[ierr] )
+        print(ref.ravel()[-10:])
+        print(decomp.ravel()[-10:])
+        import pylab as pl
+        pl.imshow(ref,aspect='auto',interpolation='nearest')
+        pl.figure()
+        pl.imshow(output.view( ref.dtype ).reshape(ref.shape) - ref, aspect='auto', interpolation='nearest')
+        pl.show()
 
-start = timeit.default_timer()
-decompressor = BSLZ4CUDA( total_output_bytes )
-now   = timeit.default_timer()
-print( "Create cuda thing",  now-start )
-
-start = timeit.default_timer()
-decomp = decompressor( chunk, (shape[1],shape[2]), dtyp, blocksize, blocks, out=output )
-now = timeit.default_timer()
-dt = now - start
-print( "Call cuda thing %.3f ms, %.3f GB/s (metric)" % ( dt * 1000, decomp.nbytes / dt / 1e9 ) )
-print( "total bytes = %d"%(decomp.nbytes))
 
 
-if (ref==decomp).all():
-    print("Test passes!!!")
-else:
-    print("FAILS!!!")
-    print("decomp:")
-    print(decomp.ravel()[:128])
-    print("ref:")
-    print(ref)
-    err = abs(ref-decomp).ravel()
-    ierr  = np.argmax( err)
-    print(ierr, decomp.ravel()[ierr], ref.ravel()[ierr] )
-    print(ref.ravel()[-10:])
-    print(decomp.ravel()[-10:])
-    import pylab as pl
-    pl.imshow(ref,aspect='auto',interpolation='nearest')
-    pl.figure()
-    pl.imshow(output.view( ref.dtype ).reshape(ref.shape) - ref, aspect='auto', interpolation='nearest')
-    pl.show()
+if __name__=="__main__":
+
+    hname = sys.argv[1]
+    dset  = sys.argv[2]
+    frm   = int(sys.argv[3])
+    testcase( hname, dset, frm )
