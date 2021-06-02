@@ -10,7 +10,7 @@ import numpy as np, bitshuffle, hdf5plugin, h5py
 from pycuda.compiler import SourceModule
 
 try:
-    from sfdsadfsaread_chunks import get_chunk, get_blocks
+    from read_chunks import get_chunk, get_blocks
 except:
     print("You do not have read_chunk, using a h5py+numba version")
     import numba, struct
