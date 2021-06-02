@@ -1,6 +1,6 @@
 
 
-
+# In the long run, this is probably going to need something like scikit-build
 
 #bslz4decoders.cpython-38-x86_64-linux-gnu.so : bslz4decoders.c bslz4decoders.pyf
 #	LDSHARED="icc -shared" CC="icc" CFLAGS="-std=c99 -fopenmp -xHost -fast -ipp" python -m numpy.f2py \
@@ -22,6 +22,15 @@
 #	-llz4 -lippdc -lippcore -lhdf5
 
 
+# windows:
+# python -m numpy.f2py -c bslz4decoders.pyf bslz4decoders.c -I%CONDA_PREFIX%/Library/include -L%CONDA_PREFIX%/Library/lib -lhdf5 -lliblz4
+#
+# ... needed an edit inside of distutils/_msvccompiler to do the inplace build.
+# ... for both the compile and link steps :
+#        print("****",__file__)
+#        if extra_preargs is None:
+#            extra_preargs = ["/openmp", "/Ox", "/arch:AVX2"]
+
 
 
 bslz4decoders.so: bslz4decoders.c bslz4decoders.pyf
@@ -37,7 +46,7 @@ bslz4testcases.h5: make_testcases.py
 	rm bslz4testcases.h5
 	python make_testcases.py
 
-test: bslz4testcases.h5 testcases.py 
+test: bslz4testcases.h5 testcases.py
 	py.test --ignore=bitshuffle
 	python bench_read.py
 	python test_decoders.py

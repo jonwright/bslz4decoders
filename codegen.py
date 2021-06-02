@@ -274,8 +274,10 @@ lz4decoders = cfragments(
     # requires the blocks to be first created
     omp_lz4 = cfrag("""
     int error=0;
+    {
+    int i; /* msvc does not let you put this inside the for */
 #pragma omp parallel for shared(error)
-    for( int i = 0; i < blocks_length-1; i++ ){
+    for(  i = 0; i < blocks_length-1; i++ ){
 #ifdef USEIPP
       int bsize = blocksize;
       IppStatus ret = ippsDecodeLZ4_8u( &compressed[blocks[i] + 4u], (int) READ32BE( compressed + blocks[i] ),
@@ -312,6 +314,7 @@ lz4decoders = cfragments(
                                      lastblock );
       if ( CHECK_RETURN_VALS && ( ret != lastblock ) ) ERR("Error decoding last LZ4 block");
 #endif
+      }
       }
     """),
     # without using the blocks
