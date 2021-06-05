@@ -10,7 +10,7 @@ import numpy as np, bitshuffle, hdf5plugin, h5py
 from pycuda.compiler import SourceModule
 
 try:
-    from noread_chunks import get_chunk, get_blocks
+    from read_chunks import get_chunk, get_blocks
 except:
     print("You do not have read_chunk, using a h5py+numba version")
     import numba, struct
@@ -676,22 +676,30 @@ class BSLZ4CUDA:
         copystart = self.total_output_bytes - copies
         self.chunk_d = drv.mem_alloc( chunk.nbytes )        # the compressed data
         self.blocks_d = drv.mem_alloc( blocks.nbytes )      # 32 bit offsets into the compressed for blocks
-
-        # drv.memcpy_htod( chunk_d, chunk )         # compressed data on the device
-        # drv.memcpy_htod( blocks_d, blocks )
-        self.lz4dc_forBSLZ4( drv.In( chunk  ),
-                             drv.In( blocks ),
+        e = (drv.Event(), drv.Event(), drv.Event(), drv.Event() )
+        
+        drv.memcpy_htod( self.chunk_d, chunk )         # compressed data on the device
+        drv.memcpy_htod( self.blocks_d, blocks )
+        e[0].record()
+        self.lz4dc_forBSLZ4( self.chunk_d,
+                             self.blocks_d,
                              np.int32(len(blocks)),
                              np.int32(blocksize),
                              self.output_d,
                              np.int32(copies),               # todo : move the copy to directly go to output ?
                              np.int32(copystart),
                             block=lz4block, grid=lz4grid)
-
+        e[1].record()
         self.shuffle( self.output_d, self.shuf_d,
                             block = self.shblock, grid = self.shgrid )
+        e[2].record()
         # last block
         drv.memcpy_dtoh( output,  self.shuf_d )
+        e[3].record()
+        e[3].synchronize()
+        for i in range(3):
+            print("Time",e[i].time_till(e[i+1]))
+        
         return output.view( dtyp ).reshape( shape )
 
 def testcase( hname, dset, frm):
@@ -722,6 +730,7 @@ def testcase( hname, dset, frm):
         print(ierr, decomp.ravel()[ierr], ref.ravel()[ierr] )
         print(ref.ravel()[-10:])
         print(decomp.ravel()[-10:])
+        sys.exit()
         import pylab as pl
         pl.imshow(ref,aspect='auto',interpolation='nearest')
         pl.figure()
