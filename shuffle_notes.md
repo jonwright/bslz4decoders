@@ -150,3 +150,7 @@ Also:
 https://github.com/dsnet/matrix-transpose/blob/master/matrix_transpose.c
 
 There is also code in hackers delight for 32x32 unrolled. 
+
+CUDA code : 
+
+https://stackoverflow.com/questions/46615703/efficiently-transposing-a-large-dense-binary-matrix
