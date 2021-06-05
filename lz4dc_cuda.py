@@ -2,7 +2,7 @@
 
 
 
-import timeit, sys
+import sys
 import pycuda.autoinit
 import pycuda.driver as drv
 import pycuda
@@ -10,7 +10,7 @@ import numpy as np, bitshuffle, hdf5plugin, h5py
 from pycuda.compiler import SourceModule
 
 try:
-    from read_chunks import get_chunk, get_blocks
+    from noread_chunks import get_chunk, get_blocks
 except:
     print("You do not have read_chunk, using a h5py+numba version")
     import numba, struct
@@ -38,7 +38,7 @@ except:
             n = int((chunk[i] << 24) + (chunk[i+1] << 16) + (chunk[i+2] << 8) + chunk[i+3])
             blocks[j] = i + n + 4
 
-    def get_blocks(chunk):
+    def get_blocks(chunk, shape, dtype):
         """ Get the block size and addresses out of the chunk"""
         nbytes, blocksize = struct.unpack('!QL', chunk[:12])
         if blocksize == 0:
@@ -542,6 +542,22 @@ __global__ void lz4dc_forBSLZ4 (
   }
 }
 
+/*
+    start pointer (aligned, we assume)
+    end pointer
+
+     block to process
+     0 ... N-2  : size = 8192
+     N - 1      : size = total % ( elsize * 8 )
+     copy       : what is left
+
+    32 bit data
+      8192 bytes = 2048 output values
+      2048 bits = 256 bytes for the first bit = 64 uint32
+
+      32 threads. Load in[0],64,128,...
+
+*/
 
 __global__ void simple_shuffle(const uint8_t * __restrict__ in, uint8_t * __restrict__ out,
                           const uint32_t blocksize, const uint32_t total_bytes, const uint32_t elemsize ) {
@@ -590,20 +606,60 @@ __global__ void simple_shuffle(const uint8_t * __restrict__ in, uint8_t * __rest
          }
   }
 }
+
+
+__global__ void simple_shuffle32(const uint32_t * __restrict__ in, uint32_t * __restrict__ out,
+                          const uint32_t blocksize, const uint32_t total_bytes, const uint32_t elemsize ) {
+  //                 0-32                        32
+  uint32_t dest = threadIdx.x + blockIdx.x * blockDim.x;      // where to write output
+  uint32_t block_id = (dest * elemsize) / blocksize;          // which block is this block ?
+  uint32_t nblocks = total_bytes / blocksize;                    // rounds down
+  if ( blocksize == 8192 && elemsize == 4 && block_id < nblocks) {
+      uint32_t block_start = block_id * 2048;               // where did the block start ?
+      uint32_t position_in_block = dest - block_start;     // 0 -> 2048
+      uint32_t src = block_start + position_in_block/32 + threadIdx.x * 64;
+      uint32_t myval = in[ src ];
+      uint32_t vdest = 0U;
+      #pragma unroll 32
+      for( int i = 0; i < 32; i++ ){
+            vdest |= (__ballot_sync(0xFFFFFFFFU,  (1U<<i) & myval) * ( threadIdx.x == i ));
+      }
+      out[dest] = vdest;
+  }
+}
+
+
+
 """
 
 
 
 
 class BSLZ4CUDA:
-    def __init__(self, total_output_bytes ):
+    def __init__(self, total_output_bytes, bpp ):
         """ cache / reuse memory """
         self.total_output_bytes = total_output_bytes
+        open("ksrc.cu","w").write(modsrc)
         self.mod = SourceModule( modsrc )
+        self.mods = SourceModule( open("shuffles.cu", "r").read() )
         self.lz4dc_forBSLZ4 = self.mod.get_function("lz4dc_forBSLZ4")
-        self.simple_shuffle = self.mod.get_function("simple_shuffle")
+        #self.simple_shuffle = self.mod.get_function("simple_shuffle")
+        # self.simple_shuffle = self.mod.get_function("simple_shuffle32")
+        if bpp == 4:
+            self.shuffle = self.mods.get_function("shuf_8192_32")
+            self.shblock = (32,32,1)   # various transpose examples
+            nblocks = total_output_bytes // 8192
+            self.shgrid  = ( nblocks , 2 , 1 )
+        elif bpp == 1:
+            self.shuffle = self.mods.get_function("shuf_8192_8")
+            self.shblock = (32,8,4)   # various transpose examples
+            nblocks = total_output_bytes // 8192
+            self.shgrid  = ( nblocks , 2 , 1 )
+
         self.output_d = drv.mem_alloc( total_output_bytes ) # holds the lz4 decompressed, still shuffled data
         self.shuf_d =   drv.mem_alloc( total_output_bytes ) # holds the final unshuffled data
+                # shuffle blocking:
+
 
     def __call__(self, chunk, shape, dtyp, blocksize, blocks, out=None ):
         bpp = dtyp.itemsize
@@ -618,9 +674,6 @@ class BSLZ4CUDA:
         lz4grid = ((len(blocks)+2)//2,1,1)
         copies  = ( self.total_output_bytes % ( bpp * 8 ) )
         copystart = self.total_output_bytes - copies
-        # shuffle blocking:
-        shblock = (32,1,1)   # no good reason. Was told 32 in a warp.
-        shgrid  = ((output.nbytes + 31) // 32, 1, 1) # Going to be wrong for 16 bits ?
         self.chunk_d = drv.mem_alloc( chunk.nbytes )        # the compressed data
         self.blocks_d = drv.mem_alloc( blocks.nbytes )      # 32 bit offsets into the compressed for blocks
 
@@ -635,9 +688,8 @@ class BSLZ4CUDA:
                              np.int32(copystart),
                             block=lz4block, grid=lz4grid)
 
-        self.simple_shuffle( self.output_d, self.shuf_d, np.uint32( blocksize ),
-                            np.uint32( total_output_bytes ), np.uint32( bpp ),
-                            block = shblock, grid = shgrid )
+        self.shuffle( self.output_d, self.shuf_d,
+                            block = self.shblock, grid = self.shgrid )
         # last block
         drv.memcpy_dtoh( output,  self.shuf_d )
         return output.view( dtyp ).reshape( shape )
@@ -647,13 +699,14 @@ def testcase( hname, dset, frm):
     chunk, shape, dtyp  = get_chunk( hname, dset, frm )
     total_output_elem  = shape[1]*shape[2]
     total_output_bytes = total_output_elem*dtyp.itemsize
-    blocksize, blocks = get_blocks( chunk )
+    blocksize, blocks = get_blocks( chunk, shape, dtyp )
 
     output = np.empty( total_output_elem, dtyp )
-    decompressor = BSLZ4CUDA( total_output_bytes )
+    decompressor = BSLZ4CUDA( total_output_bytes, dtyp.itemsize )
     decomp = decompressor( chunk, (shape[1],shape[2]), dtyp, blocksize, blocks, out=output )
 
     ref = h5py.File( hname, 'r' )[dset][frm]
+    print( ref.nbytes, 'bytes')
 
     if (ref==decomp).all():
         print("Test passes!!!")
@@ -661,6 +714,7 @@ def testcase( hname, dset, frm):
         print("FAILS!!!")
         print("decomp:")
         print(decomp.ravel()[:128])
+        print(decomp)
         print("ref:")
         print(ref)
         err = abs(ref-decomp).ravel()
@@ -671,7 +725,7 @@ def testcase( hname, dset, frm):
         import pylab as pl
         pl.imshow(ref,aspect='auto',interpolation='nearest')
         pl.figure()
-        pl.imshow(output.view( ref.dtype ).reshape(ref.shape) - ref, aspect='auto', interpolation='nearest')
+        pl.imshow(decomp, aspect='auto', interpolation='nearest')
         pl.show()
 
 
