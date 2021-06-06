@@ -12,13 +12,17 @@ def write_array( h5name, dsetname, ary ):
 
 def make_testcases( ):
     hname = "bslz4testcases.h5"
-    shp = (6, 1237, 4571)  # with awkward shape
+    shp = (6, 2048, 2048)  # with awkward shape
     nelem = np.prod(shp)
     for dtyp, label in ( ( np.uint8, 'data_uint8' ),
                          ( np.uint16, 'data_uint16' ),
                          ( np.uint32, 'data_uint32' ) ):
-        ary = np.arange( nelem, dtype = dtyp ).reshape( shp )
-        write_array( hname, label, ary )
+        ary = np.ones( nelem, dtype=dtyp )
+        i = 0
+        while (i*64+64) < ary.size:
+            ary[ i*64:i*64+64 ] = i
+            i += 1
+        write_array( hname, label, ary.reshape(shp) )
 
 
 if __name__=="__main__":
