@@ -34,7 +34,7 @@
 
 
 bslz4decoders.so: bslz4decoders.c bslz4decoders.pyf
-	CFLAGS='-fopenmp -march=native -std=c99' python -m numpy.f2py -c bslz4decoders.pyf bslz4decoders.c -I$CONDA_PREFIX/include -L$CONDA_PREFIX/lib -lhdf5 -llz4
+	CFLAGS='-fopenmp -march=native -std=c99' python -m numpy.f2py -c bslz4decoders.pyf bslz4decoders.c -I${CONDA_PREFIX}/include -L${CONDA_PREFIX}/lib -lhdf5 -llz4
 
 bslz4decoders.pyf: codegen.py
 	python codegen.py bslz4decoders

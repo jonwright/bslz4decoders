@@ -645,14 +645,19 @@ class BSLZ4CUDA:
         self.lz4dc_forBSLZ4 = self.mod.get_function("lz4dc_forBSLZ4")
         #self.simple_shuffle = self.mod.get_function("simple_shuffle")
         # self.simple_shuffle = self.mod.get_function("simple_shuffle32")
-        if bpp == 4:
+        if bpp==4:
             self.shuffle = self.mods.get_function("shuf_8192_32")
             self.shblock = (32,32,1)   # various transpose examples
             nblocks = total_output_bytes // 8192
             self.shgrid  = ( nblocks , 2 , 1 )
-        elif bpp == 1:
+        elif bpp==2:
+            self.shuffle = self.mods.get_function("shuf_8192_16")
+            self.shblock = (32,32,1)   # various transpose examples
+            nblocks = total_output_bytes // 8192
+            self.shgrid  = ( nblocks , 2 , 1 )
+        elif bpp==1:
             self.shuffle = self.mods.get_function("shuf_8192_8")
-            self.shblock = (32,8,4)   # various transpose examples
+            self.shblock = (32,32,1)   # various transpose examples
             nblocks = total_output_bytes // 8192
             self.shgrid  = ( nblocks , 2 , 1 )
 
@@ -721,8 +726,8 @@ def testcase( hname, dset, frm):
     else:
         print("FAILS!!!")
         print("decomp:")
-        print(decomp.ravel()[:128])
-        print(decomp)
+        for i in range(0,8192,64):
+          print(i,decomp.ravel()[i:i+64])
         print("ref:")
         print(ref)
         err = abs(ref-decomp).ravel()
@@ -730,7 +735,7 @@ def testcase( hname, dset, frm):
         print(ierr, decomp.ravel()[ierr], ref.ravel()[ierr] )
         print(ref.ravel()[-10:])
         print(decomp.ravel()[-10:])
-        sys.exit()
+#        sys.exit()
         import pylab as pl
         pl.imshow(ref,aspect='auto',interpolation='nearest')
         pl.figure()
