@@ -608,27 +608,6 @@ __global__ void simple_shuffle(const uint8_t * __restrict__ in, uint8_t * __rest
 }
 
 
-__global__ void simple_shuffle32(const uint32_t * __restrict__ in, uint32_t * __restrict__ out,
-                          const uint32_t blocksize, const uint32_t total_bytes, const uint32_t elemsize ) {
-  //                 0-32                        32
-  uint32_t dest = threadIdx.x + blockIdx.x * blockDim.x;      // where to write output
-  uint32_t block_id = (dest * elemsize) / blocksize;          // which block is this block ?
-  uint32_t nblocks = total_bytes / blocksize;                    // rounds down
-  if ( blocksize == 8192 && elemsize == 4 && block_id < nblocks) {
-      uint32_t block_start = block_id * 2048;               // where did the block start ?
-      uint32_t position_in_block = dest - block_start;     // 0 -> 2048
-      uint32_t src = block_start + position_in_block/32 + threadIdx.x * 64;
-      uint32_t myval = in[ src ];
-      uint32_t vdest = 0U;
-      #pragma unroll 32
-      for( int i = 0; i < 32; i++ ){
-            vdest |= (__ballot_sync(0xFFFFFFFFU,  (1U<<i) & myval) * ( threadIdx.x == i ));
-      }
-      out[dest] = vdest;
-  }
-}
-
-
 
 """
 
@@ -660,7 +639,7 @@ class BSLZ4CUDA:
             self.shblock = (32,32,1)   # various transpose examples
             nblocks = total_output_bytes // 8192
             self.shgrid  = ( nblocks , 2 , 1 )
-
+        self.shuf_end = self.mods.get_function("shuf_end")
         self.output_d = drv.mem_alloc( total_output_bytes ) # holds the lz4 decompressed, still shuffled data
         self.shuf_d =   drv.mem_alloc( total_output_bytes ) # holds the final unshuffled data
                 # shuffle blocking:
@@ -682,7 +661,7 @@ class BSLZ4CUDA:
         self.chunk_d = drv.mem_alloc( chunk.nbytes )        # the compressed data
         self.blocks_d = drv.mem_alloc( blocks.nbytes )      # 32 bit offsets into the compressed for blocks
         e = (drv.Event(), drv.Event(), drv.Event(), drv.Event() )
-        
+
         drv.memcpy_htod( self.chunk_d, chunk )         # compressed data on the device
         drv.memcpy_htod( self.blocks_d, blocks )
         e[0].record()
@@ -697,6 +676,11 @@ class BSLZ4CUDA:
         e[1].record()
         self.shuffle( self.output_d, self.shuf_d,
                             block = self.shblock, grid = self.shgrid )
+       # self.shuf_end( self.output_d, self.shuf_d,
+       #               np.uint32(bpp * 8),  # uint32_t elemsize,  /* in bits  */
+       #               np.uint32( blocksize), #          uint32_t blocksize, /* in bytes */
+       #               np.uint32(total_output_bytes), #          uint32_t datasize
+       #                     block = self.shblock, grid = self.shgrid )
         e[2].record()
         # last block
         drv.memcpy_dtoh( output,  self.shuf_d )
@@ -704,7 +688,7 @@ class BSLZ4CUDA:
         e[3].synchronize()
         for i in range(3):
             print("Time",e[i].time_till(e[i+1]))
-        
+
         return output.view( dtyp ).reshape( shape )
 
 def testcase( hname, dset, frm):
@@ -740,6 +724,8 @@ def testcase( hname, dset, frm):
         pl.imshow(ref,aspect='auto',interpolation='nearest')
         pl.figure()
         pl.imshow(decomp, aspect='auto', interpolation='nearest')
+        pl.figure()
+        pl.imshow(ref-decomp, aspect='auto', interpolation='nearest')
         pl.show()
 
 
