@@ -8,37 +8,46 @@ def get_frame_h5py( h5name, dset, frame ):
         frm = h5f[dset][frame]
     return frm
 
-def get_chunk( h5name, dset, frame ):
+def get_chunk( h5name, dset, frame, useh5py=True ):
     with h5py.File(h5name, "r") as h5f:
         dset = h5f[dset]
         assert len(dset.chunks) == 3
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
-        # inefficient
-        buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
-                           np.uint8 )
-        csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
-        return buffer[:csize].copy(), dset.shape, dset.dtype        
+        if useh5py:
+            filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
+            buffer = np.frombuffer( buffer, dtype=np.uint8 ) 
+        else:        # inefficient
+            buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
+                               np.uint8 )
+            csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
+            buffer = buffer[:csize].copy()
+        return buffer, dset.shape, dset.dtype        
 
 def get_frames_h5py( h5name, dset ):
     with h5py.File(h5name, "r") as h5f:
         for frm in h5f[dset]:
             yield frm
 
-def get_chunks( h5name, dset ):
+def get_chunks( h5name, dset, useh5py=True ):
     with h5py.File(h5name, "r") as h5f:
         dset = h5f[dset]
         assert len(dset.chunks) == 3
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
-        # inefficient
-        buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
-                           np.uint8 ) 
+        if not useh5py:
+            buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
+                               np.uint8 )
         for frame in range(dset.shape[0]):
-            csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
-            yield buffer[:csize], dset.shape, dset.dtype
+            if useh5py:
+                filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
+                buffer = np.frombuffer( buffer, dtype=np.uint8 ) 
+            else:        # inefficient
+                csize = bslz4decoders.h5_read_direct( dset.id.id, frame, buffer )
+                buffer = buffer[:csize].copy()
+            yield buffer, dset.shape, dset.dtype
 
             
 def get_blocks( chunk, shape, dtyp ):
