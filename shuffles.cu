@@ -144,10 +144,10 @@ __global__ void shuf_end( const uint32_t * __restrict__ in,
     __shared__ uint32_t smem[32][33];
     int itemx = threadIdx.x / elemsize;
     uint32_t t, v, mask, in_address, out_address;
+    out_address = threadIdx.x + elemsize*(itemx * 31 + threadIdx.y) + blockIdx.y*1024 + blockIdx.x*2048 ;
     switch (elemsize){
         case 8:
-           mask = 0xFFU << itemx;
-           out_address = threadIdx.x + itemx * 248 +  threadIdx.y*8 + blockIdx.y*1024 + blockIdx.x*2048 ;
+           mask = 0xFFU << (8*itemx);
            in_address = threadIdx.x              +   // Aligned loads. 32*4 = 128 bytes = 1024 bits
                                                 (threadIdx.y / 8) * 32   +   // end of the threadIdx.x reads
                                                 (threadIdx.y % 8) * 256  +   // position of the next bit
@@ -155,21 +155,16 @@ __global__ void shuf_end( const uint32_t * __restrict__ in,
                                                 blockIdx.y*128 ;
            break;
         case 16:
-           mask = 0xFFFFU << itemx;
-           out_address = threadIdx.x + itemx * 248 +  threadIdx.y*16 + blockIdx.y*1024 + blockIdx.x*2048 ;
-            in_address = threadIdx.x     +   // Aligned loads. 32*4 = 128 bytes = 1024 bits
+           mask = 0xFFFFU << (16*itemx);
+           in_address = threadIdx.x     +   // Aligned loads. 32*4 = 128 bytes = 1024 bits
                                                 ( threadIdx.y / 16 ) * 32      +   // end of the threadIdx.x reads
                                                 ( threadIdx.y % 16 ) * 128     +   // position of the next bit
                                                 blockIdx.x*2048 +   // Start of the block
                                                 blockIdx.y*64 ;
            break;
         case 32:
-           mask = 0xFFFFFFFFU; // not used
-           out_address = threadIdx.x + threadIdx.y*32 + blockIdx.y*1024 + blockIdx.x*2048;
-           in_address = threadIdx.x     +   // Aligned loads. 32*4 = 128 bytes
-                                                threadIdx.y*64  +   // Offset to next bit = 8192/32/4.
-                                                blockIdx.x*2048 +   // Start of the block
-                                                blockIdx.y*32 ;
+           mask = 0U; // unused
+           in_address = threadIdx.x   +  threadIdx.y * 64  + blockIdx.x*2048 +  blockIdx.y*32 ;
            break;
     }
 
@@ -212,11 +207,12 @@ __global__ void shuf_end( const uint32_t * __restrict__ in,
             }
             break;
        case 16:
-           v = ( ( smem[ 2 * (threadIdx.x%16)   ][ threadIdx.y ] & mask ) >> 16*itemx ) |
-               ( ( smem[ 2 * (threadIdx.x%16)+1 ][ threadIdx.y ] & mask ) << 16*(1-itemx) );
+           v = ( ( smem[ 2 * (threadIdx.x%16)   ][ threadIdx.y ] & mask ) >> (itemx*16) ) |
+               ( ( smem[ 2 * (threadIdx.x%16)+1 ][ threadIdx.y ] & mask ) << (16-itemx*16) );
             break;
        case 32:
             v = smem[threadIdx.x][threadIdx.y];
+            break;
    }
    out[ out_address ] = v;
     }

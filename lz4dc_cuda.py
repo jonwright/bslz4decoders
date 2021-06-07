@@ -183,10 +183,10 @@ struct token_type
   __device__ position_type numMatchesOverflow() const
   {
     if (hasNumMatchesOverflow()) {
-      assert(num_matches >= 19);
+//      assert(num_matches >= 19);
       return num_matches - 19;
     } else {
-      assert(num_matches < 19);
+  //    assert(num_matches < 19);
       return 0;
     }
   }
@@ -290,13 +290,13 @@ public:
     setAndAlignOffset(offset);
 
     if (m_offset + DECOMP_INPUT_BUFFER_SIZE <= m_length) {
-      assert(
+/*      assert(
           reinterpret_cast<size_t>(m_compData + m_offset)
               % sizeof(double_word_type)
           == 0);
       assert(
           DECOMP_INPUT_BUFFER_SIZE
-          == DECOMP_THREADS_PER_CHUNK * sizeof(double_word_type));
+          == DECOMP_THREADS_PER_CHUNK * sizeof(double_word_type)); */
       const double_word_type* const word_data
           = reinterpret_cast<const double_word_type*>(m_compData + m_offset);
       double_word_type* const word_buffer
@@ -384,7 +384,7 @@ inline __device__ position_type lengthOfMatch(
     const position_type next_location,
     const position_type length)
 {
-  assert(prev_location < next_location);
+//  assert(prev_location < next_location);
 
   position_type match_length = length - next_location - 5;
   for (position_type j = 0; j + next_location + 5 < length; j += blockDim.x) {
@@ -493,7 +493,7 @@ inline __device__ void decompressStream(
       decomp_idx += match;
     }
   }
-  assert(comp_idx == comp_end);
+//  assert(comp_idx == comp_end);
 }
 
 inline __device__ uint32_t read32be( const uint8_t* address )
@@ -674,13 +674,15 @@ class BSLZ4CUDA:
                              np.int32(copystart),
                             block=lz4block, grid=lz4grid)
         e[1].record()
-        self.shuffle( self.output_d, self.shuf_d,
+        if 0:
+          self.shuffle( self.output_d, self.shuf_d,
                             block = self.shblock, grid = self.shgrid )
-       # self.shuf_end( self.output_d, self.shuf_d,
-       #               np.uint32(bpp * 8),  # uint32_t elemsize,  /* in bits  */
-       #               np.uint32( blocksize), #          uint32_t blocksize, /* in bytes */
-       #               np.uint32(total_output_bytes), #          uint32_t datasize
-       #                     block = self.shblock, grid = self.shgrid )
+        else:
+          self.shuf_end( self.output_d, self.shuf_d,
+                      np.uint32(bpp * 8),  # uint32_t elemsize,  /* in bits  */
+                      np.uint32( blocksize), #          uint32_t blocksize, /* in bytes */
+                      np.uint32(total_output_bytes), #          uint32_t datasize
+                            block = self.shblock, grid = self.shgrid )
         e[2].record()
         # last block
         drv.memcpy_dtoh( output,  self.shuf_d )
