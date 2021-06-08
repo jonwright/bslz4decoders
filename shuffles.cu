@@ -7,6 +7,12 @@
 
 #include <stdint.h>
 
+
+__global__ void copybytes(uint8_t * src, uint32_t srcstart, uint8_t * dst, uint32_t dststart )
+{
+  dst[threadIdx.x + dststart] = src[threadIdx.x+srcstart];
+}
+
 __global__ void shuf_8192_32(const uint32_t * __restrict__ in,
                                    uint32_t * __restrict__ out ){
     /*
@@ -197,7 +203,9 @@ __global__ void simple_shuffle(const uint8_t * __restrict__ in, uint8_t * __rest
 
 
 __global__ void simple_shuffle_end(const uint8_t * __restrict__ in, uint8_t * __restrict__ out,
-                          const uint32_t blocksize, const uint32_t total_bytes, const uint32_t elemsize ) {
+                          const uint32_t blocksize, const uint32_t total_bytes, const uint32_t elemsize,
+                          const uint32_t startpos
+                           ) {
   // slow : do not use except for debugging
   //                 0-32                        32
   uint32_t dest = threadIdx.x + blockIdx.x * blockDim.x;      // where to write output
@@ -216,20 +224,15 @@ __global__ void simple_shuffle_end(const uint8_t * __restrict__ in, uint8_t * __
      bsize -= tocopy;
      elements_in_block = bsize / elemsize;
      if( position_in_block >= elements_in_block ){
-         // this is a copy
-         for( int i = 0 ; i < elemsize ; i++ ){
-             out[ dest * elemsize + i ] = in[ dest * elemsize + i ];
-         }
          loop = 0;
      } else  {
          position_in_block = position_in_block % elements_in_block;
      }
   }
   if (loop && block_id <= nblocks) {
-     const uint8_t * mybyte = in + block_start + ( position_in_block / 8 );
+     const uint8_t * mybyte = in + startpos + block_start + ( position_in_block / 8 );
      uint8_t mymask = 1U << (position_in_block % 8);
      uint32_t bytestride = bsize / ( 8 * elemsize );
-
      uint32_t myval = 0;
      for( int i = 0 ; i < elemsize*8 ; i ++ ) {       // grab my bits
         if( (*mybyte & mymask) > 0 ) {
@@ -238,7 +241,7 @@ __global__ void simple_shuffle_end(const uint8_t * __restrict__ in, uint8_t * __
         mybyte = mybyte + bytestride;
      }
      for( int i = 0; i<elemsize ; i++){
-         out[dest * elemsize + i] = (uint8_t) ((myval)>>(8*i));
+         out[startpos + dest * elemsize + i] = (uint8_t) ((myval)>>(8*i));
          }
   }
 }

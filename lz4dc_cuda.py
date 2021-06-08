@@ -16,24 +16,27 @@ class BSLZ4CUDA:
 
     def __init__(self, total_output_bytes, bpp, blocksize ):
         """ cache / reuse memory """
+        try:
+            self.mod = pycuda.compiler.SourceModule( self.modsrc )
+        except:
+            open('kernel.cu', 'w').write(self.modsrc)
+            raise
+        self.h5lz4dc   = self.mod.get_function("h5lz4dc")
+        self.shuf_end = self.mod.get_function("simple_shuffle_end")
+        self.copybytes = self.mod.get_function("copybytes")
+
+        self.reset(  total_output_bytes, bpp, blocksize )
+
+    def reset(self, total_output_bytes, bpp, blocksize):
 
         self.total_output_bytes = total_output_bytes
         self.bpp = bpp
         self.blocksize = np.uint32( blocksize )
-        try:
-          self.mod = pycuda.compiler.SourceModule( self.modsrc )
-        except:
-          open('kernel.cu', 'w').write(self.modsrc)
-          raise
-
-        self.h5lz4dc   = self.mod.get_function("h5lz4dc")
         self.shuf_8192 = self.mod.get_function( "shuf_8192_%d"%(bpp*8) )
-        # self.shuf_end  = self.mod.get_function( "shuf_end_%d"%(bpp*8) )
-        self.shuf_end = self.mod.get_function("simple_shuffle_end")
 
         # number of full 8 kB blocks (rounds down)
-        self.nblocks = total_output_bytes // 8192
-        self.tblocks = (total_output_bytes + 8191)//8192
+        self.nblocks = self.total_output_bytes // 8192
+        self.tblocks = (self.total_output_bytes + 8191)//8192
         # block size for shuffles
         # shuffle blocking:
         self.shblock = (32,32,1)   # various transpose examples
@@ -61,17 +64,17 @@ class BSLZ4CUDA:
             if self.shuf_d is None:
                 self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
             outd = self.shuf_d
-            out = np.empty( total_output_bytes, np.uint8 )
-
-        if hasattr( outarg, "__cuda_array_interface__" ): # return a CUDA array
-            outd = outarg
-        else: # hope that was a numpy array
-            out = outarg.ravel().view( np.uint8 )
-            assert out.nbytes == self.total_output_bytes, "out is the wrong size"
-            assert len(out.shape) == 1, "use flat/ravelled array for output (no padding)"
-            if self.shuf_d is None:
-                self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
-            outd = self.shuf_d
+            out = np.empty( self.total_output_bytes, np.uint8 )
+        else:
+            if hasattr( outarg, "__cuda_array_interface__" ): # return a CUDA array
+                outd = outarg
+            else: # hope that was a numpy array
+                out = outarg.ravel().view( np.uint8 )
+                assert out.nbytes == self.total_output_bytes, "out is the wrong size"
+                assert len(out.shape) == 1, "use flat/ravelled array for output (no padding)"
+                if self.shuf_d is None:
+                    self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
+                outd = self.shuf_d
 
         chunk_d = pycuda.driver.mem_alloc( chunk.nbytes )        # the compressed data
         pycuda.driver.memcpy_htod( chunk_d, chunk )         # compressed data on the device
@@ -85,21 +88,26 @@ class BSLZ4CUDA:
         self.shuf_8192( self.output_d, outd, block = self.shblock, grid = self.shgrid )
         pos = self.nblocks*self.blocksize
         todo = self.total_output_bytes - pos
-        self.shuf_end( self.output_d[pos:],
-                           outd[pos:],
+        if todo > self.bytes_to_copy:
+            self.shuf_end( self.output_d,
+                           outd,
                            self.blocksize,
                            np.uint32(todo),
                            np.uint32(self.bpp),
+                           np.uint32(pos),
                            block = (32,1,1), grid = (int((todo+31)//32),1,1) )
         if hasattr( outarg, "__cuda_array_interface__"):
             if self.bytes_to_copy > 0:
-                pycuda.driver.memcpy_htod( outd[-self.bytes_to_copy:].gpudata, chunk[-self.bytes_to_copy:])
+                self.copybytes(  chunk_d, np.uint32( chunk.nbytes - self.bytes_to_copy ),
+                                 outd, np.uint32( self.total_output_bytes - self.bytes_to_copy),
+                                 block = ( self.bytes_to_copy, 1, 1 ), grid = (1,1,1) )
             return outd
         else:
             try:
                 self.shuf_d.get( out )
             except:
                 print(self.shuf_d.shape, self.shuf_d.dtype, out.shape, out.dtype)
+                raise
             if self.bytes_to_copy > 0:
                 out[-self.bytes_to_copy:] = chunk[-self.bytes_to_copy:]
             return out

@@ -1,7 +1,6 @@
 
 
 import sys, hdf5plugin, h5py, timeit, numpy as np
-import concurrent.futures
 
 def read_serial( hname, dsetname ):
     starto = timeit.default_timer()
@@ -19,6 +18,8 @@ def read_serial( hname, dsetname ):
     dto = endo - starto
     mb = bytesread / 1e6 # generous
     print("%6.1f MB, %6.3f ms, %6.1f MB/s %6.3f ms overhead %s" % ( mb, 1e3*dt, mb / dt, 1e3*(dto-dt), dsetname ) )
+
+
 
 if __name__=="__main__":
     if len(sys.argv) == 1:
