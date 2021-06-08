@@ -3,12 +3,11 @@
 
 
 import sys
-import pycuda.autoinit
-import pycuda.driver, pycuda.gpuarray, pycuda.compiler
-
 import numpy as np, bitshuffle, hdf5plugin, h5py
 
 from read_chunks import get_chunk, get_blocks
+
+import pycuda.autoinit, pycuda.driver, pycuda.gpuarray, pycuda.compiler
 
 class BSLZ4CUDA:
 
@@ -49,7 +48,7 @@ class BSLZ4CUDA:
         self.shuf_d = None #  hold the final unshuffled data, can be an output arg
         # last few bytes are copied:
         self.bytes_to_copy  = ( self.total_output_bytes % ( bpp * 8 ) )
-        print("bytes to copy", self.bytes_to_copy)
+        # print("bytes to copy", self.bytes_to_copy)
 
     def __call__(self, chunk, blocks, outarg=None ):
         """
@@ -124,7 +123,6 @@ def testcase( hname, dset, frm):
 
 
     ref = h5py.File( hname, 'r' )[dset][frm]
-    print( ref.nbytes, 'bytes')
 
     if (ref==decomp).all():
         print("Test passes!!!")
