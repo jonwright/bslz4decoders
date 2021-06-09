@@ -19,7 +19,7 @@ The interests are:
 
 - getting data decompressed directly inside a GPU
 - reading an ROI without decompressing a full image (for CPU)
-- learning about what is happening in when reading compressed data
+- learning about what is happening when reading compressed data
 
 To build:
 ```
