@@ -14,13 +14,12 @@ end function h5_chunk_size
 
 
 
-function h5_open_dset(h5file,dsetname)
-intent(c) h5_open_dset
+function h5_close_dset(dset)
+intent(c) h5_close_dset
 intent(c)
-integer(kind=8) :: h5file
-integer(kind=1) , intent(inout) , dimension( dsetname_length):: dsetname
-integer(kind=8) :: h5_open_dset
-end function h5_open_dset
+integer(kind=8) :: dset
+integer(kind=4) :: h5_close_dset
+end function h5_close_dset
 
 
 
@@ -37,7 +36,7 @@ function h5_open_dset(h5file,dsetname)
 intent(c) h5_open_dset
 intent(c)
 integer(kind=8) :: h5file
-integer(kind=1) , intent(inout) , dimension( dsetname_length):: dsetname
+integer(kind=1) :: dsetname
 integer(kind=8) :: h5_open_dset
 end function h5_open_dset
 
@@ -46,7 +45,7 @@ end function h5_open_dset
 function h5_open_file(hname)
 intent(c) h5_open_file
 intent(c)
-integer(kind=1) , intent(inout) , dimension( hname_length):: hname
+integer(kind=1) :: hname
 integer(kind=8) :: h5_open_file
 end function h5_open_file
 

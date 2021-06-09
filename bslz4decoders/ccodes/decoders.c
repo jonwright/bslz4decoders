@@ -2,9 +2,10 @@
 /* A curated collection of different BSLZ4 readers
    This is automatically generated code
    Edit this to change the original :
-     codegen.py
+     C:\Users\wright\Work
+   Folders\Documents\programming\github\jonwright\bslz4decoders\bslz4decoders\ccodes\codegen.py
    Created on :
-     Wed Jun  9 15:00:20 2021
+     Wed Jun  9 15:51:51 2021
    Code generator written by Jon Wright.
 */
 

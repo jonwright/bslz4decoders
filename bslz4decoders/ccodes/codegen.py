@@ -283,13 +283,10 @@ FUNCS['h5_open_dset'] = cfunc(
     return dataset;
     """ )
 FUNCS['h5_close_dset'] = cfunc(
-    "size_t h5_open_dset", #  hid_t is int64_t (today, somwhere)
-    ["int64_t h5file", "char * dsetname" ],
+    "int h5_close_dset", #  hid_t is int64_t (today, somwhere)
+    ["int64_t dset"],
     """
-    hid_t dataset;
-    if((dataset = H5Dopen2(h5file, dsetname, H5P_DEFAULT)) < 0)
-        ERR("Failed to open datset");
-    return dataset;
+    return H5Dclose( dset );
     """ )
 FUNCS['h5_chunk_size'] = cfunc(
     "size_t h5_chunk_size", # name, args, body
@@ -361,7 +358,7 @@ def main( testcompile = False ):
 
     h5funcs = {name:FUNCS[name] for name in FUNCS if name.startswith("h5")}
     write_pyf("h5chunk", "h5chunk.c", h5funcs )
-    write_funcs("h5chunk.c", h5funcs, INCLUDES + H5H, "" )
+    write_funcs("h5chunk.c", h5funcs, INCLUDES + H5H, MACROS )
     for name in h5funcs:
         FUNCS.pop( name )
 

@@ -91,7 +91,7 @@ class cfunc:
             tokens = a.split( )
             anames.append( tokens[-1] )
         fname = self.name.split()[-1]
-        sub = self.name.startswith("void")
+        sub = self.name.startswith("void") # no return value
         lines = ['\n']
         if sub:
             lines.append( "subroutine %s(%s)"%(fname, ",".join(anames)) )
@@ -110,9 +110,15 @@ class cfunc:
                     intent = 'intent(in)'
                 else:
                     intent = 'intent(inout)'
-                dim = "dimension( %s_length)"%(a)
-                decl = ' , '.join( (TMAP[m], intent, dim ))
-                decl += ":: %s"%( a )
+                # This is disgusting. Strings have "name" in the variable name.
+                # ... how did we ever end up in this mess. Could we go for
+                # pointer "*" versus "[]" or put "ndarray" in the names instead?
+                if a.find("name") < 0:
+                    dim = "dimension( %s_length)"%(a)
+                    decl = ' , '.join( (TMAP[m], intent, dim ))
+                    decl += ":: %s"%( a )
+                else:
+                    decl = TMAP[m] + " :: %s"%( a )
             elif a.endswith('_length'):
                 decl = TMAP[m] + ' , intent( hide ), depend( %s ) :: %s'%(
                    a.replace('_length',''), a )

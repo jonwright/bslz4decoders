@@ -2,9 +2,10 @@
 /* A curated collection of different BSLZ4 readers
    This is automatically generated code
    Edit this to change the original :
-     codegen.py
+     C:\Users\wright\Work
+   Folders\Documents\programming\github\jonwright\bslz4decoders\bslz4decoders\ccodes\codegen.py
    Created on :
-     Wed Jun  9 15:00:20 2021
+     Wed Jun  9 15:51:51 2021
    Code generator written by Jon Wright.
 */
 
@@ -18,10 +19,30 @@
 #endif
 
 #include <hdf5.h> /* to grab chunks independently of h5py api (py27 issue) */
+
+/* see https://justine.lol/endian.html */
+#define READ32BE(p)                                                            \
+  ((uint32_t)(255 & (p)[0]) << 24 | (uint32_t)(255 & (p)[1]) << 16 |           \
+   (uint32_t)(255 & (p)[2]) << 8 | (uint32_t)(255 & (p)[3]))
+#define READ64BE(p)                                                            \
+  ((uint64_t)(255 & (p)[0]) << 56 | (uint64_t)(255 & (p)[1]) << 48 |           \
+   (uint64_t)(255 & (p)[2]) << 40 | (uint64_t)(255 & (p)[3]) << 32 |           \
+   (uint64_t)(255 & (p)[4]) << 24 | (uint64_t)(255 & (p)[5]) << 16 |           \
+   (uint64_t)(255 & (p)[6]) << 8 | (uint64_t)(255 & (p)[7]))
+
+#define ERRVAL -1
+
+#define ERR(s)                                                                 \
+  {                                                                            \
+    fprintf(stderr, "ERROR %s\n", s);                                          \
+    return ERRVAL;                                                             \
+  }
+
+#define CHECK_RETURN_VALS 1
 /* Signature for h5_chunk_size */
 size_t h5_chunk_size(int64_t, int);
 /* Signature for h5_close_dset */
-size_t h5_open_dset(int64_t, char *);
+int h5_close_dset(int64_t);
 /* Signature for h5_close_file */
 int h5_close_file(int64_t);
 /* Signature for h5_open_dset */
@@ -47,14 +68,13 @@ size_t h5_chunk_size(int64_t dataset_id, int frame) {
   }
 
 } /* Definition for h5_close_dset */
-size_t h5_open_dset(int64_t h5file, char *dsetname) {
+int h5_close_dset(int64_t dset) {
 
-  hid_t dataset;
-  if ((dataset = H5Dopen2(h5file, dsetname, H5P_DEFAULT)) < 0)
-    ERR("Failed to open datset");
-  return dataset;
+  return H5Dclose(dset);
 
-} /* Definition for h5_close_file */
+  return 0;
+}
+/* Definition for h5_close_file */
 int h5_close_file(int64_t hfile) {
 
   return H5Fclose(hfile);

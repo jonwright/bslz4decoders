@@ -33,6 +33,7 @@
 
 all:
 	echo "Historical makefile, do not use"
+	python setup.py build_ext --inplace
 
 bslz4decoders.so: bslz4decoders.c bslz4decoders.pyf
 	CFLAGS='-fopenmp -march=native -std=c99' python -m numpy.f2py -c bslz4decoders.pyf bslz4decoders.c -I${CONDA_PREFIX}/include -L${CONDA_PREFIX}/lib -lhdf5 -llz4
