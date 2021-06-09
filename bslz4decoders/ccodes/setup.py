@@ -70,6 +70,12 @@ def compile_paths( place ):
 
 if "CONDA_PREFIX" in os.environ:
     incdirs, libdirs = compile_paths( os.environ["CONDA_PREFIX"] )
+elif os.path.exists( "/nobackup/scratch/HDF5/HDF5-1.10.5" ): # scisoft15
+	incdirs, libdirs = compile_paths( "/nobackup/scratch/HDF5/HDF5-1.10.5" )
+	print("LD_LIBRARY_PATH=/nobackup/scratch/HDF5/HDF5-1.10.5/lib")
+	input("ok?")
+	
+
             
             
 if platform.system == 'Windows':
