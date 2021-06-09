@@ -5,17 +5,15 @@ Setup script
 Re-builds the C code via
    python codegen.py
 """
-import codegen
-codegen.main()
+if 0:
+    import codegen
+    codegen.main()
 
-# For pip / bdist_wheel etc
-import setuptools
+# import setuptools
 import os, sys, platform, os.path
-
 
 from distutils.core import setup, Extension
 from distutils.command import build_ext
-
 import numpy, numpy.f2py
 
 
@@ -31,6 +29,7 @@ copt =  {
     'unix': ['-fopenmp', '-O2'], #, '-DF2PY_REPORT_ON_ARRAY_COPY=100'] ,
     'mingw32': ['-fopenmp', '-O2'] ,
  }
+
 lopt =  { k : [a for a in l] for k,l in copt.items() }
 lopt['msvc'] = []
 
@@ -56,13 +55,27 @@ class build_ext_subclass( build_ext.build_ext ):
                     e.extra_link_args)
         build_ext.build_ext.build_extensions(self)
 
-if "CONDA_PREFIX" in os.environ:
-    incdirs = [ numpy.get_include(),
-        fortraninc,
-        os.path.join( os.environ['CONDA_PREFIX'], "Library", "include" ), ]
-    libdirs = [os.path.join( os.environ['CONDA_PREFIX'], "Library", "lib" ),]
 
-LZ4 = "liblz4"
+def compile_paths( place ):
+    incdirs = [ numpy.get_include(), fortraninc ] 
+    libdirs = [ ]
+    cp = place
+    for root in [os.path.join( cp, "Library" ), cp ]:
+        i = os.path.join( root, "include" )
+        l = os.path.join( root, "lib")
+        if os.path.exists( i ) and os.path.exists( l ):
+            incdirs.append( i )
+            libdirs.append( l )
+    return incdirs, libdirs
+
+if "CONDA_PREFIX" in os.environ:
+    incdirs, libdirs = compile_paths( os.environ["CONDA_PREFIX"] )
+            
+            
+if platform.system == 'Windows':
+    LZ4 = "liblz4"
+else:
+    LZ4 = "lz4"
 
 ext_modules = [ Extension( "h5chunk",
                       sources = ["h5chunk.c", "h5chunkmodule.c", fortranobj],
