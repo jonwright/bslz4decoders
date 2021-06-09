@@ -1,6 +1,0 @@
-[submodule "bitshuffle"]
-	path = bitshuffle
-	url = https://github.com/kiyo-masui/bitshuffle
-[submodule "nvcomp"]
-	path = nvcomp
-	url = https://github.com/NVIDIA/nvcomp/
