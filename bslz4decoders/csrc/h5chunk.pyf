@@ -1,0 +1,66 @@
+
+python module h5chunk
+
+interface
+        
+
+function h5_chunk_size(dataset_id,frame)
+intent(c) h5_chunk_size
+intent(c)
+integer(kind=8) :: dataset_id
+integer(kind=4) :: frame
+integer(kind=8) :: h5_chunk_size
+end function h5_chunk_size
+
+
+
+function h5_open_dset(h5file,dsetname)
+intent(c) h5_open_dset
+intent(c)
+integer(kind=8) :: h5file
+integer(kind=1) , intent(inout) , dimension( dsetname_length):: dsetname
+integer(kind=8) :: h5_open_dset
+end function h5_open_dset
+
+
+
+function h5_close_file(hfile)
+intent(c) h5_close_file
+intent(c)
+integer(kind=8) :: hfile
+integer(kind=4) :: h5_close_file
+end function h5_close_file
+
+
+
+function h5_open_dset(h5file,dsetname)
+intent(c) h5_open_dset
+intent(c)
+integer(kind=8) :: h5file
+integer(kind=1) , intent(inout) , dimension( dsetname_length):: dsetname
+integer(kind=8) :: h5_open_dset
+end function h5_open_dset
+
+
+
+function h5_open_file(hname)
+intent(c) h5_open_file
+intent(c)
+integer(kind=1) , intent(inout) , dimension( hname_length):: hname
+integer(kind=8) :: h5_open_file
+end function h5_open_file
+
+
+
+function h5_read_direct(dataset_id,frame,chunk,chunk_length)
+intent(c) h5_read_direct
+intent(c)
+integer(kind=8) :: dataset_id
+integer(kind=4) :: frame
+integer(kind=1) , intent(inout) , dimension( chunk_length):: chunk
+integer(kind=8) , intent( hide ), depend( chunk ) :: chunk_length
+integer(kind=8) :: h5_read_direct
+end function h5_read_direct
+
+end interface
+end module h5chunk

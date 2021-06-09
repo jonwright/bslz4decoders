@@ -1,0 +1,35 @@
+
+python module ompdecoders
+
+interface
+        
+
+function omp_lz4(compressed,compressed_length,itemsize,output,output_length)
+intent(c) omp_lz4
+intent(c)
+integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
+integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
+integer(kind=4) :: itemsize
+integer(kind=1) , intent(inout) , dimension( output_length):: output
+integer(kind=8) , intent( hide ), depend( output ) :: output_length
+integer(kind=4) :: omp_lz4
+end function omp_lz4
+
+
+
+function omp_lz4_blocks(compressed,compressed_length,itemsize,blocksize,blocks,blocks_length,output,output_length)
+intent(c) omp_lz4_blocks
+intent(c)
+integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
+integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
+integer(kind=4) :: itemsize
+integer(kind=4) :: blocksize
+integer(kind=-4) , intent(inout) , dimension( blocks_length):: blocks
+integer(kind=4) , intent( hide ), depend( blocks ) :: blocks_length
+integer(kind=1) , intent(inout) , dimension( output_length):: output
+integer(kind=8) , intent( hide ), depend( output ) :: output_length
+integer(kind=4) :: omp_lz4_blocks
+end function omp_lz4_blocks
+
+end interface
+end module ompdecoders
