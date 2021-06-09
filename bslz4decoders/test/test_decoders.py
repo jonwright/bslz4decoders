@@ -3,7 +3,7 @@
 import hdf5plugin, h5py
 import numpy as np
 import bslz4decoders, bitshuffle, timeit
-import read_chunks
+from bslz4decoders import read_chunks
 from testcases import testcases
 
 
@@ -64,13 +64,16 @@ def runtest_lz4blockdecoders( decoder, frame = 0, rpt = 10 ):
         print( " ", h5name, dset )
 
 def testonecore():
-    runtest_lz4chunkdecoders(bslz4decoders.onecore_lz4)
+    from bslz4decoders.ccodes.decoders import onecore_lz4
+    runtest_lz4chunkdecoders(onecore_lz4)
 
 def testomp():
-    runtest_lz4chunkdecoders(bslz4decoders.omp_lz4)
+    from bslz4decoders.ccodes.ompdecoders import omp_lz4
+    runtest_lz4chunkdecoders(omp_lz4)
 
 def testompblocked():
-    runtest_lz4blockdecoders(bslz4decoders.omp_lz4_blocks)
+    from bslz4decoders.ccodes.ompdecoders import omp_lz4_blocks
+    runtest_lz4blockdecoders(omp_lz4_blocks)
 
 
 if __name__=="__main__":

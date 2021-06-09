@@ -1,0 +1,7 @@
+include *.py *.md
+include doc *.md
+recursive-include bslz4decoders *.py
+recursive-include bslz4decoders/cuda *
+recursive-include bslz4decoders/ccodes *.c *.pyf *.py
+
+

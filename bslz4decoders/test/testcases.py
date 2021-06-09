@@ -32,10 +32,9 @@ def check_and_show( a1, a2 ):
         pl.show()
 
 
-
-if __name__=="__main__":
-    from lz4dc_cuda import BSLZ4CUDA
-    from read_chunks import get_chunk, get_blocks, get_frame_h5py
+def testcuda():
+    from bslz4decoders.lz4dc_cuda import BSLZ4CUDA
+    from bslz4decoders.read_chunks import get_chunk, get_blocks, get_frame_h5py
     from timeit import default_timer
     import numpy
     import numpy as np
@@ -83,3 +82,8 @@ if __name__=="__main__":
         check_and_show( ref, data.reshape((shp[1],shp[2])))
         assert(sref == sdata),  " ".join((repr(sref),repr(sdata)))
         assert(sref == sgpu),  " ".join((repr(sref),repr(sdata)))
+
+
+
+if __name__=="__main__":
+    testcuda()

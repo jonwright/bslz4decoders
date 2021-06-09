@@ -2,17 +2,23 @@
 
 
 
-import sys
-import numpy as np, bitshuffle, hdf5plugin, h5py
+import os, sys
+import numpy as np, h5py
 
-from read_chunks import get_chunk, get_blocks
+from bslz4decoders.read_chunks import get_chunk, get_blocks
 
 import pycuda.autoinit, pycuda.driver, pycuda.gpuarray, pycuda.compiler
 
+def get_sources():
+    folder =  os.path.join( os.path.split(__file__)[0], "cuda")
+    names  = "nvcomp_extract.cu", "h5lz4dc.cu", "shuffles.cu"
+    lines = [ open( os.path.join( folder, name ), 'r' ).read() for name in  names ]
+    return " ".join( lines )
+
+
 class BSLZ4CUDA:
 
-    modsrc = " ".join( [ open(srcfile, 'r').read() for srcfile in
-        ( "nvcomp_extract.cu", "h5lz4dc.cu", "shuffles.cu" ) ] )
+    modsrc = get_sources()
 
     def __init__(self, total_output_bytes, bpp, blocksize ):
         """ cache / reuse memory """
@@ -126,9 +132,6 @@ def testcase( hname, dset, frm):
 
 #    outputd = pycuda.gpuarray.empty( total_output_elem, dtyp )
 #    decomp2 = decompressor( chunk, blocks, outarg=outputd ).get().view( dtyp ).reshape( (shape[1], shape[2]) )
-
-
-
 
     ref = h5py.File( hname, 'r' )[dset][frm]
 

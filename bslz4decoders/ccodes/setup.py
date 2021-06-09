@@ -83,6 +83,6 @@ ext_modules = [ Extension( "h5chunk",
                       library_dirs  = libdirs ),
                   ]
 
-setup( ext_modules = ext_modules )
+setup( name = "ccodes" , ext_modules = ext_modules )
 
 
