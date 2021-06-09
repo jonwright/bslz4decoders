@@ -1,4 +1,31 @@
-One strange thing, transpose != untranpose. How is that:
+
+## Bitshuffled data
+
+Within the hdf5 bslz4 format the data come in blocks. These blocks are usually 8192
+bytes long, except for the last block. Each individual block is bit transposed. This
+means the original data are:
+
+ - 8192 bytes * 8 = 65536 bits
+ - For 32-bit data this is a bit matrix of size [2048][32]
+ - For 16 bit data [4096][16]
+ - etc
+
+Making the transpose of this gives a block of data which are:
+ - 32-bit data [32][2048] = [32][ 256 bytes] = [32][ 64 u32]
+ - 16-bit data [16][4096] = [16][ 512 bytes] = [16][128 u32]
+ -  8-bit data  [8][8192] = [ 8][1024 bytes] = [ 8][256 u32]
+
+If the last block has fewer values than needed (2048 for 32 bit) then the block length
+for that block is reduced. The last block length is chosen to have a multiple of 8 elements
+in order to get aligned output data. Any left over values that are not a multiple
+of 8 are copied directly to the output. For 8 bit data the blocksize should be a multiple
+of 8 (bytes), for 16 bits the multiple is 16, for 32-bits it should be 32 (bytes).
+
+Some pictures would be useful here.
+
+## Random notes
+
+One strange thing, transpose != untranpose. How is that (see above) ? The matrix is rectangular !
 
  - usual block size is 8192 bytes
  - this is either (1024,8) or (2048,4) or (4096,2) or (8192,1) elements
@@ -8,6 +35,7 @@ One strange thing, transpose != untranpose. How is that:
  - Case of (4092, 2) -> (2, 4096)...
  - ... The first 4096 bits (==512 bytes), (==256 uint16) are the first bit of each output
 
+## code from the bitshuffle library
 
 bshuf_untrans_bit_elem : undo the transpose
 
@@ -104,7 +132,7 @@ int64_t bshuf_shuffle_bit_eightelem_scal(const void* in, void* out, \
 
     nbyte = elem_size * size;   // ?? fix size
 
-     // ?? looping over the 8 bits 
+     // ?? looping over the 8 bits
     for (jj = 0; jj < 8 * elem_size; jj += 8) {
         for (ii = 0; ii + 8 * elem_size - 1 < nbyte; ii += 8 * elem_size) {
             x = *((uint64_t*) &in_b[ii + jj]);  // one 8x8 byte block
@@ -124,6 +152,7 @@ int64_t bshuf_shuffle_bit_eightelem_scal(const void* in, void* out, \
 }
 ```
 
+## Found on the internet
 
 From https://stackoverflow.com/questions/6930667/what-is-the-fastest-way-to-transpose-the-bits-in-an-8x8-block-on-bits
 
@@ -149,8 +178,8 @@ Also:
 
 https://github.com/dsnet/matrix-transpose/blob/master/matrix_transpose.c
 
-There is also code in hackers delight for 32x32 unrolled. 
+There is also code in hackers delight for 32x32 unrolled.
 
-CUDA code : 
+CUDA code :
 
 https://stackoverflow.com/questions/46615703/efficiently-transposing-a-large-dense-binary-matrix
