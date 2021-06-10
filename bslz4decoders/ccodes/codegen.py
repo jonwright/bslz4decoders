@@ -146,9 +146,9 @@ lz4decoders = cfragments(
     for(  i = 0; i < blocks_length-1; i++ ){
 #ifdef USEIPP
       int bsize = blocksize;
-      IppStatus ret = ippsDecodeLZ4_8u( &compressed[blocks[i] + 4u], (int) READ32BE( compressed + blocks[i] ),
+      IppStatus ret = ippsDecodeLZ4_8u( (Ipp8u*) &compressed[blocks[i] + 4u], (int) READ32BE( compressed + blocks[i] ),
                                          &output[i * blocksize], &bsize );
-      if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
+      if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) error = 1;
 #else
         int ret = LZ4_decompress_safe(  compressed + blocks[i] + 4u,
                                            output + i * blocksize,
@@ -169,9 +169,9 @@ lz4decoders = cfragments(
       int nbytes = (int) READ32BE( compressed + blocks[blocks_length - 1]);
 #ifdef USEIPP
       int bsize = lastblock;
-      IppStatus ret = ippsDecodeLZ4_8u( &compressed[ blocks[blocks_length-1] + 4u],
+      IppStatus ret = ippsDecodeLZ4_8u( (Ipp8u*) &compressed[ blocks[blocks_length-1] + 4u],
                                         (int) READ32BE( compressed + blocks[blocks_length-1] ),
-                                         &output[(blocks_length-1) * blocksize], &bsize );
+                                         (Ipp8u*) &output[(blocks_length-1) * blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
 #else
       int ret = LZ4_decompress_safe( compressed + blocks[blocks_length-1] + 4u,
@@ -189,8 +189,9 @@ lz4decoders = cfragments(
     for( int i = 0; i < blocks_length - 1 ; ++i ){
        int nbytes = (int) READ32BE( &compressed[p] );
 #ifdef USEIPP
-      IppStatus ret = ippsDecodeLZ4_8u( &compressed[p + 4], nbytes,
-                                         &output[i * blocksize], &bsize );
+      int bsize = blocksize;
+      IppStatus ret = ippsDecodeLZ4_8u( (Ipp8u*) &compressed[p + 4], nbytes,
+                                        (Ipp8u*) &output[i * blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
 #else
        int ret = LZ4_decompress_safe( &compressed[p + 4],
@@ -213,8 +214,8 @@ lz4decoders = cfragments(
       int nbytes = (int) READ32BE( &compressed[p] );
 #ifdef USEIPP
       int bsize = blocksize;
-      IppStatus ret = ippsDecodeLZ4_8u( &compressed[p + 4], nbytes,
-                                         &output[(blocks_length-1)* blocksize], &bsize );
+      IppStatus ret = ippsDecodeLZ4_8u( (Ipp8u*) &compressed[p + 4], nbytes,
+                                        (Ipp8u*) &output[(blocks_length-1)* blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
 #else
       int ret = LZ4_decompress_safe( &compressed[p + 4],

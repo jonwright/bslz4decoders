@@ -38,6 +38,14 @@ lopt['msvc'] = []
 # CFLAGS=-march=native -mtune=native
 # LDFLAGS=-march=native -mtune=native
 
+#  LDSHARED="icc -shared -ipp -ipp-link=static -xHost"                   \
+#   CFLAGS="-DUSEIPP -ipp -ipp-link=static -O3 -std=c99 -fopenmp -xHost" \
+#    CC=icc python setup.py build_ext --inplace --force
+#  ... -> 
+
+
+
+
 class build_ext_subclass( build_ext.build_ext ):
     def build_extensions(self):
         """ attempt to defer the numpy import until later """
