@@ -41,7 +41,7 @@ lopt['msvc'] = []
 #  LDSHARED="icc -shared -ipp -ipp-link=static -xHost"                   \
 #   CFLAGS="-DUSEIPP -ipp -ipp-link=static -O3 -std=c99 -fopenmp -xHost" \
 #    CC=icc python setup.py build_ext --inplace --force
-#  ... -> 
+#  ... ->
 
 
 
@@ -65,7 +65,7 @@ class build_ext_subclass( build_ext.build_ext ):
 
 
 def compile_paths( place ):
-    incdirs = [ numpy.get_include(), fortraninc ] 
+    incdirs = [ numpy.get_include(), fortraninc ]
     libdirs = [ ]
     cp = place
     for root in [os.path.join( cp, "Library" ), cp ]:
@@ -82,11 +82,11 @@ elif os.path.exists( "/nobackup/scratch/HDF5/HDF5-1.10.5" ): # scisoft15
 	incdirs, libdirs = compile_paths( "/nobackup/scratch/HDF5/HDF5-1.10.5" )
 	print("LD_LIBRARY_PATH=/nobackup/scratch/HDF5/HDF5-1.10.5/lib")
 	input("ok?")
-	
 
-            
-            
-if platform.system == 'Windows':
+
+
+
+if platform.system() == 'Windows':
     LZ4 = "liblz4"
 else:
     LZ4 = "lz4"
