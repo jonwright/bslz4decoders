@@ -29,7 +29,7 @@ def h5chunk_chunk( h5name, dsetname, frame):
         chunk = np.empty( nbytes, np.uint8 )
         err = h5chunk.h5_read_direct( dsid, frame, chunk )
     except:
-        raise("Error reading %s %s %d"%(h5name, dsetname, frame))
+        raise Exceptio("Error reading %s %s %d"%(h5name, dsetname, frame))
     finally:
         if dsid is not None:
             h5chunk.h5_close_dset( dsid )
