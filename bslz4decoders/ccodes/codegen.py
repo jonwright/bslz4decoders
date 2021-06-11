@@ -64,11 +64,11 @@ MACROS = """
 """
 
 # To interpret a chunk coming from hdf5. Includes the 12 byte header.
-chunk_args = [  "const char * compressed",
+chunk_args = [  "const uint8_t * compressed",
                 "size_t compressed_length",
                 "int itemsize" ]
 # To write output data
-output_args = [ "char * output",
+output_args = [ "uint8_t * output",
                 "size_t output_length" ]
 # Same as for chunks, but includes an array of blocks.
 # These point to the 4 byte BE int which prefix each lz4 block.
@@ -262,7 +262,7 @@ FUNCS['omp_lz4_with_starts_func'] = cfunc(
 # If you use h5py. datasetid. get_chunk_info() then you can skip all this.
 FUNCS['h5_open_file'] = cfunc(
     "size_t h5_open_file", #  hid_t is int64_t (today, somwhere)
-    ["char * hname"],
+    ["char* hname"],
     """
     hid_t file;
     file = H5Fopen( hname,  H5F_ACC_RDONLY, H5P_DEFAULT );
@@ -276,7 +276,7 @@ FUNCS['h5_close_file'] = cfunc(
     """ )
 FUNCS['h5_open_dset'] = cfunc(
     "size_t h5_open_dset", #  hid_t is int64_t (today, somwhere)
-    ["int64_t h5file", "char * dsetname" ],
+    ["int64_t h5file", "char* dsetname" ],
     """
     hid_t dataset;
     if((dataset = H5Dopen2(h5file, dsetname, H5P_DEFAULT)) < 0)
@@ -303,6 +303,8 @@ FUNCS['h5_chunk_size'] = cfunc(
     hsize_t chunk_nbytes;
     herr_t ret;
     ret = H5Dget_chunk_storage_size(dataset_id, offset, &chunk_nbytes);
+    if( ret == 0 )
+        return chunk_nbytes;
     return ret;
 }
 """)
@@ -310,7 +312,7 @@ FUNCS['h5_read_direct'] = cfunc(
     "size_t h5_read_direct", # name, args, body
                              # hid_t is int64_t (today, somwhere)
                             # hsize_t in unsigned long long == uint64_t (today, somewhere)
-    ["int64_t dataset_id", "int frame", "char * chunk", "size_t chunk_length" ],
+    ["int64_t dataset_id", "int frame", "uint8_t * chunk", "size_t chunk_length" ],
     """
 {
 /* see:

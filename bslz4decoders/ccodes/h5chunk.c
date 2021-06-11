@@ -2,10 +2,9 @@
 /* A curated collection of different BSLZ4 readers
    This is automatically generated code
    Edit this to change the original :
-     C:\Users\wright\Work
-   Folders\Documents\programming\github\jonwright\bslz4decoders\bslz4decoders\ccodes\codegen.py
+     codegen.py
    Created on :
-     Wed Jun  9 15:51:51 2021
+     Fri Jun 11 16:54:12 2021
    Code generator written by Jon Wright.
 */
 
@@ -50,7 +49,7 @@ size_t h5_open_dset(int64_t, char *);
 /* Signature for h5_open_file */
 size_t h5_open_file(char *);
 /* Signature for h5_read_direct */
-size_t h5_read_direct(int64_t, int, char *, size_t);
+size_t h5_read_direct(int64_t, int, uint8_t *, size_t);
 /* Definition for h5_chunk_size */
 size_t h5_chunk_size(int64_t dataset_id, int frame) {
 
@@ -64,6 +63,8 @@ size_t h5_chunk_size(int64_t dataset_id, int frame) {
     hsize_t chunk_nbytes;
     herr_t ret;
     ret = H5Dget_chunk_storage_size(dataset_id, offset, &chunk_nbytes);
+    if (ret == 0)
+      return chunk_nbytes;
     return ret;
   }
 
@@ -97,7 +98,7 @@ size_t h5_open_file(char *hname) {
   return file;
 
 } /* Definition for h5_read_direct */
-size_t h5_read_direct(int64_t dataset_id, int frame, char *chunk,
+size_t h5_read_direct(int64_t dataset_id, int frame, uint8_t *chunk,
                       size_t chunk_length) {
 
   {

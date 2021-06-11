@@ -2,10 +2,9 @@
 /* A curated collection of different BSLZ4 readers
    This is automatically generated code
    Edit this to change the original :
-     C:\Users\wright\Work
-   Folders\Documents\programming\github\jonwright\bslz4decoders\bslz4decoders\ccodes\codegen.py
+     codegen.py
    Created on :
-     Wed Jun  9 15:51:51 2021
+     Fri Jun 11 16:54:12 2021
    Code generator written by Jon Wright.
 */
 
@@ -40,14 +39,14 @@
 
 #define CHECK_RETURN_VALS 1
 /* Signature for onecore_lz4_func */
-int onecore_lz4(const char *, size_t, int, char *, size_t);
+int onecore_lz4(const uint8_t *, size_t, int, uint8_t *, size_t);
 /* Signature for print_offsets_func */
-int print_offsets(const char *, size_t, int);
+int print_offsets(const uint8_t *, size_t, int);
 /* Signature for read_starts_func */
-int read_starts(const char *, size_t, int, int, uint32_t *, int);
+int read_starts(const uint8_t *, size_t, int, int, uint32_t *, int);
 /* Definition for onecore_lz4_func */
-int onecore_lz4(const char *compressed, size_t compressed_length, int itemsize,
-                char *output, size_t output_length) {
+int onecore_lz4(const uint8_t *compressed, size_t compressed_length,
+                int itemsize, uint8_t *output, size_t output_length) {
   /* begin: total_length */
 
   size_t total_output_length;
@@ -76,8 +75,9 @@ int onecore_lz4(const char *compressed, size_t compressed_length, int itemsize,
   for (int i = 0; i < blocks_length - 1; ++i) {
     int nbytes = (int)READ32BE(&compressed[p]);
 #ifdef USEIPP
-    IppStatus ret = ippsDecodeLZ4_8u(&compressed[p + 4], nbytes,
-                                     &output[i * blocksize], &bsize);
+    int bsize = blocksize;
+    IppStatus ret = ippsDecodeLZ4_8u((Ipp8u *)&compressed[p + 4], nbytes,
+                                     (Ipp8u *)&output[i * blocksize], &bsize);
     if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
       ERR("Error LZ4 block");
 #else
@@ -100,9 +100,9 @@ int onecore_lz4(const char *compressed, size_t compressed_length, int itemsize,
     int nbytes = (int)READ32BE(&compressed[p]);
 #ifdef USEIPP
     int bsize = blocksize;
-    IppStatus ret =
-        ippsDecodeLZ4_8u(&compressed[p + 4], nbytes,
-                         &output[(blocks_length - 1) * blocksize], &bsize);
+    IppStatus ret = ippsDecodeLZ4_8u(
+        (Ipp8u *)&compressed[p + 4], nbytes,
+        (Ipp8u *)&output[(blocks_length - 1) * blocksize], &bsize);
     if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
       ERR("Error LZ4 block");
 #else
@@ -118,7 +118,7 @@ int onecore_lz4(const char *compressed, size_t compressed_length, int itemsize,
   return 0;
 }
 /* Definition for print_offsets_func */
-int print_offsets(const char *compressed, size_t compressed_length,
+int print_offsets(const uint8_t *compressed, size_t compressed_length,
                   int itemsize) {
   /* begin: total_length */
 
@@ -178,8 +178,9 @@ int print_offsets(const char *compressed, size_t compressed_length,
   return 0;
 }
 /* Definition for read_starts_func */
-int read_starts(const char *compressed, size_t compressed_length, int itemsize,
-                int blocksize, uint32_t *blocks, int blocks_length) {
+int read_starts(const uint8_t *compressed, size_t compressed_length,
+                int itemsize, int blocksize, uint32_t *blocks,
+                int blocks_length) {
   /* begin: read_starts */
 
   blocks[0] = 12;

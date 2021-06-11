@@ -36,7 +36,7 @@ function h5_open_dset(h5file,dsetname)
 intent(c) h5_open_dset
 intent(c)
 integer(kind=8) :: h5file
-integer(kind=1) :: dsetname
+character*(*) :: dsetname
 integer(kind=8) :: h5_open_dset
 end function h5_open_dset
 
@@ -45,7 +45,7 @@ end function h5_open_dset
 function h5_open_file(hname)
 intent(c) h5_open_file
 intent(c)
-integer(kind=1) :: hname
+character*(*) :: hname
 integer(kind=8) :: h5_open_file
 end function h5_open_file
 
@@ -56,7 +56,7 @@ intent(c) h5_read_direct
 intent(c)
 integer(kind=8) :: dataset_id
 integer(kind=4) :: frame
-integer(kind=1) , intent(inout) , dimension( chunk_length):: chunk
+integer(kind=-1) , intent(inout) , dimension( chunk_length):: chunk
 integer(kind=8) , intent( hide ), depend( chunk ) :: chunk_length
 integer(kind=8) :: h5_read_direct
 end function h5_read_direct

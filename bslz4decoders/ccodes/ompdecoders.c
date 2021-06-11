@@ -2,10 +2,9 @@
 /* A curated collection of different BSLZ4 readers
    This is automatically generated code
    Edit this to change the original :
-     C:\Users\wright\Work
-   Folders\Documents\programming\github\jonwright\bslz4decoders\bslz4decoders\ccodes\codegen.py
+     codegen.py
    Created on :
-     Wed Jun  9 15:51:51 2021
+     Fri Jun 11 16:54:12 2021
    Code generator written by Jon Wright.
 */
 
@@ -40,13 +39,13 @@
 
 #define CHECK_RETURN_VALS 1
 /* Signature for omp_lz4_make_starts_func */
-int omp_lz4(const char *, size_t, int, char *, size_t);
+int omp_lz4(const uint8_t *, size_t, int, uint8_t *, size_t);
 /* Signature for omp_lz4_with_starts_func */
-int omp_lz4_blocks(const char *, size_t, int, int, uint32_t *, int, char *,
-                   size_t);
+int omp_lz4_blocks(const uint8_t *, size_t, int, int, uint32_t *, int,
+                   uint8_t *, size_t);
 /* Definition for omp_lz4_make_starts_func */
-int omp_lz4(const char *compressed, size_t compressed_length, int itemsize,
-            char *output, size_t output_length) {
+int omp_lz4(const uint8_t *compressed, size_t compressed_length, int itemsize,
+            uint8_t *output, size_t output_length) {
   /* begin: total_length */
 
   size_t total_output_length;
@@ -99,11 +98,11 @@ int omp_lz4(const char *compressed, size_t compressed_length, int itemsize,
     for (i = 0; i < blocks_length - 1; i++) {
 #ifdef USEIPP
       int bsize = blocksize;
-      IppStatus ret = ippsDecodeLZ4_8u(&compressed[blocks[i] + 4u],
+      IppStatus ret = ippsDecodeLZ4_8u((Ipp8u *)&compressed[blocks[i] + 4u],
                                        (int)READ32BE(compressed + blocks[i]),
                                        &output[i * blocksize], &bsize);
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
-        ERR("Error LZ4 block");
+        error = 1;
 #else
       int ret = LZ4_decompress_safe(
           compressed + blocks[i] + 4u, output + i * blocksize,
@@ -127,9 +126,9 @@ int omp_lz4(const char *compressed, size_t compressed_length, int itemsize,
 #ifdef USEIPP
       int bsize = lastblock;
       IppStatus ret = ippsDecodeLZ4_8u(
-          &compressed[blocks[blocks_length - 1] + 4u],
+          (Ipp8u *)&compressed[blocks[blocks_length - 1] + 4u],
           (int)READ32BE(compressed + blocks[blocks_length - 1]),
-          &output[(blocks_length - 1) * blocksize], &bsize);
+          (Ipp8u *)&output[(blocks_length - 1) * blocksize], &bsize);
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
         ERR("Error LZ4 block");
 #else
@@ -149,9 +148,9 @@ int omp_lz4(const char *compressed, size_t compressed_length, int itemsize,
   return 0;
 }
 /* Definition for omp_lz4_with_starts_func */
-int omp_lz4_blocks(const char *compressed, size_t compressed_length,
+int omp_lz4_blocks(const uint8_t *compressed, size_t compressed_length,
                    int itemsize, int blocksize, uint32_t *blocks,
-                   int blocks_length, char *output, size_t output_length) {
+                   int blocks_length, uint8_t *output, size_t output_length) {
   /* begin: total_length */
 
   size_t total_output_length;
@@ -167,11 +166,11 @@ int omp_lz4_blocks(const char *compressed, size_t compressed_length,
     for (i = 0; i < blocks_length - 1; i++) {
 #ifdef USEIPP
       int bsize = blocksize;
-      IppStatus ret = ippsDecodeLZ4_8u(&compressed[blocks[i] + 4u],
+      IppStatus ret = ippsDecodeLZ4_8u((Ipp8u *)&compressed[blocks[i] + 4u],
                                        (int)READ32BE(compressed + blocks[i]),
                                        &output[i * blocksize], &bsize);
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
-        ERR("Error LZ4 block");
+        error = 1;
 #else
       int ret = LZ4_decompress_safe(
           compressed + blocks[i] + 4u, output + i * blocksize,
@@ -195,9 +194,9 @@ int omp_lz4_blocks(const char *compressed, size_t compressed_length,
 #ifdef USEIPP
       int bsize = lastblock;
       IppStatus ret = ippsDecodeLZ4_8u(
-          &compressed[blocks[blocks_length - 1] + 4u],
+          (Ipp8u *)&compressed[blocks[blocks_length - 1] + 4u],
           (int)READ32BE(compressed + blocks[blocks_length - 1]),
-          &output[(blocks_length - 1) * blocksize], &bsize);
+          (Ipp8u *)&output[(blocks_length - 1) * blocksize], &bsize);
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
         ERR("Error LZ4 block");
 #else

@@ -50,7 +50,9 @@ class cfrag:
 
 # Type maps for f2py wrappers
 TMAP = {
-    'char': 'integer(kind=1)',
+    'char*': 'character*(*)',
+    'uint8_t':'integer(kind=-1)',
+    'int8_t': 'integer(kind=1)',
     'int16_t': 'integer(kind=2)',
     'int32_t': 'integer(kind=4)',
     'int64_t': 'integer(kind=8)',
@@ -105,20 +107,18 @@ class cfunc:
             a = tokens[-1]
             m = " ".join([ t for t in tokens[:-1] if t not in ('const','*')])
             t = " ".join(tokens[:-1])
-            if t.find("*")>0:
+            if t.find("*")>0 and t.find("char*")<0:
                 if t.find("const")>=0:
                     intent = 'intent(in)'
                 else:
                     intent = 'intent(inout)'
-                # This is disgusting. Strings have "name" in the variable name.
-                # ... how did we ever end up in this mess. Could we go for
-                # pointer "*" versus "[]" or put "ndarray" in the names instead?
-                if a.find("name") < 0:
-                    dim = "dimension( %s_length)"%(a)
+                dim = "dimension( %s_length)"%(a)
+                try:
                     decl = ' , '.join( (TMAP[m], intent, dim ))
-                    decl += ":: %s"%( a )
-                else:
-                    decl = TMAP[m] + " :: %s"%( a )
+                except:
+                    print(argu)
+                    raise
+                decl += ":: %s"%( a )
             elif a.endswith('_length'):
                 decl = TMAP[m] + ' , intent( hide ), depend( %s ) :: %s'%(
                    a.replace('_length',''), a )

@@ -7,10 +7,10 @@ interface
 function onecore_lz4(compressed,compressed_length,itemsize,output,output_length)
 intent(c) onecore_lz4
 intent(c)
-integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
+integer(kind=-1) , intent(in) , dimension( compressed_length):: compressed
 integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
 integer(kind=4) :: itemsize
-integer(kind=1) , intent(inout) , dimension( output_length):: output
+integer(kind=-1) , intent(inout) , dimension( output_length):: output
 integer(kind=8) , intent( hide ), depend( output ) :: output_length
 integer(kind=4) :: onecore_lz4
 end function onecore_lz4
@@ -20,7 +20,7 @@ end function onecore_lz4
 function print_offsets(compressed,compressed_length,itemsize)
 intent(c) print_offsets
 intent(c)
-integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
+integer(kind=-1) , intent(in) , dimension( compressed_length):: compressed
 integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
 integer(kind=4) :: itemsize
 integer(kind=4) :: print_offsets
@@ -31,7 +31,7 @@ end function print_offsets
 function read_starts(compressed,compressed_length,itemsize,blocksize,blocks,blocks_length)
 intent(c) read_starts
 intent(c)
-integer(kind=1) , intent(in) , dimension( compressed_length):: compressed
+integer(kind=-1) , intent(in) , dimension( compressed_length):: compressed
 integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
 integer(kind=4) :: itemsize
 integer(kind=4) :: blocksize
