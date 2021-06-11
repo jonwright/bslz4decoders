@@ -18,7 +18,7 @@ def benchiter( func, *args ):
     print("%.6f /s"%(end-start), func.__name__, args)
 
 
-def testbench( testcases = None ):
+def test_bench( testcases = None ):
     if testcases is None:
         from bslz4decoders.test.testcases import testcases
     for hname, d in testcases:
@@ -35,4 +35,4 @@ def testbench( testcases = None ):
 if __name__=="__main__":
     if len(sys.argv) == 3:
         testcases = [ (sys.argv[1], sys.argv[2]), ]
-    testbench( testcases )
+    test_bench( )
