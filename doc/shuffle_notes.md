@@ -16,10 +16,11 @@ Making the transpose of this gives a block of data which are:
  -  8-bit data  [8][8192] = [ 8][1024 bytes] = [ 8][256 u32]
 
 If the last block has fewer values than needed (2048 for 32 bit) then the block length
-for that block is reduced. The last block length is chosen to have a multiple of 8 elements
+for that block is reduced. The last block length is chosen to have a multiple of 8 elements (or bytes?)
 in order to get aligned output data. Any left over values that are not a multiple
-of 8 are copied directly to the output. For 8 bit data the blocksize should be a multiple
-of 8 (bytes), for 16 bits the multiple is 16, for 32-bits it should be 32 (bytes).
+of 8 are copied directly to the output. If it is 8 element multiples, then for 8 bit data 
+the blocksize should be a multiple of 8 (bytes), for 16 bits the multiple is 16, for 32-bits 
+it should be 32 (bytes), etc.
 
 Some pictures would be useful here.
 
