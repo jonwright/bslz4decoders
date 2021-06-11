@@ -33,7 +33,7 @@ METHODS = {
 
 
 def make_testcases( hname) :
-    N = 1
+    N = 2 # to test iteration
     np.random.seed(10007*10009)
     for name, shp in [ ('Frelon2K', (N, 2048, 2048) ),
                        ('Eiger4M' , (N, 2162, 2068) ),

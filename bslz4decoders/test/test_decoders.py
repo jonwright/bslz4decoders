@@ -1,85 +1,79 @@
 
 
-import hdf5plugin, h5py
+import sys, timeit
 import numpy as np
-import bslz4decoders, bitshuffle, timeit
-from bslz4decoders import read_chunks
-from testcases import testcases
-
+from bslz4decoders import read_chunks, decoders
+from bslz4decoders.test.testcases import testcases as TESTCASES
+RPT = 10
 
 def runtest_lz4chunkdecoders( decoder, frame = 0, rpt = 10 ):
-    for h5name, dset in testcases:
+    for h5name, dset in TESTCASES:
         ref = read_chunks.get_frame_h5py( h5name, dset, frame )
         t0 = timeit.default_timer()
-        for _ in range(rpt):
+        for _ in range(RPT):
             ref = read_chunks.get_frame_h5py( h5name, dset, frame )
         t1 = timeit.default_timer()
-        ref = bitshuffle.bitshuffle( ref )
         out = None
         t1 = timeit.default_timer()
-        for _ in range(rpt):
-            chunk, shp, dtyp = read_chunks.get_chunk(
-                h5name, dset, frame )
-            if out is None:
-                out = np.empty( shp[1]*shp[2], dtyp )
-            decoder( chunk, dtyp.itemsize, out.view( np.uint8 ) )
-            decoded = out
+        for _ in range(RPT):
+            config, chunk = read_chunks.get_chunk( h5name, dset, frame )
+            out = np.empty( config.shape, config.dtype )
+            decoded = decoder( chunk, config, output = out )
         t2 = timeit.default_timer()
-        if not (decoded == ref.ravel()).all():
+        if not (decoded == ref).all():
             print("Fail!")
             print(decoded)
             print(ref.ravel())
         else:
             print(" h5py %.3f ms"%((t1-t0)*1e3), end=' ')
-            print(" lz4only %.3f ms"%((t2-t1)*1e3), end= ' ')
+            print(" here %.3f ms"%((t2-t1)*1e3), end= ' ')
         print( " ", h5name, dset )
 
 
-def runtest_lz4blockdecoders( decoder, frame = 0, rpt = 10 ):
-    for h5name, dset in testcases:
+def runtest_lz4blockdecoders( decoder, frame = 0 ):
+    for h5name, dset in TESTCASES:
         ref = read_chunks.get_frame_h5py( h5name, dset, frame )
         blocks = None
         t0 = timeit.default_timer()
-        for _ in range(rpt):
+        for _ in range(RPT):
             ref = read_chunks.get_frame_h5py( h5name, dset, frame )
         t1 = timeit.default_timer()
-        ref = bitshuffle.bitshuffle( ref )
-        t1 = timeit.default_timer()
-        for _ in range(rpt):
-            chunk, shp, dtyp = read_chunks.get_chunk(
-                h5name, dset, frame )
-            if blocks is None:
-                blocksize, blocks = read_chunks.get_blocks( chunk, shp, dtyp )
-                out = np.empty( shp[1]*shp[2], dtyp )
-            decoder( chunk, dtyp.itemsize, blocksize, blocks, out.view( np.uint8 ) )
-            decoded = out
+        for _ in range(RPT):
+            config, chunk = read_chunks.get_chunk( h5name, dset, frame )
+            blocksize, blocks = config.get_blocks( chunk )
+            out = np.empty( config.shape, config.dtype )
+            decoded = decoder( chunk, config, output=out )
         t2 = timeit.default_timer()
-        if not (decoded == ref.ravel()).all():
+        if not (decoded == ref).all():
             print("Fail!")
             print(decoded)
             print(ref.ravel())
         else:
             print(" h5py %.3f ms"%((t1-t0)*1e3), end=' ')
-            print(" lz4only %.3f ms"%((t2-t1)*1e3), end= ' ')
+            print(" here %.3f ms"%((t2-t1)*1e3), end= ' ')
         print( " ", h5name, dset )
 
-def testonecore():
-    from bslz4decoders.ccodes.decoders import onecore_lz4
-    runtest_lz4chunkdecoders(onecore_lz4)
 
-def testomp():
-    from bslz4decoders.ccodes.ompdecoders import omp_lz4
-    runtest_lz4chunkdecoders(omp_lz4)
+def testchunkdecoders():
+    for func in ( # "decompress_bitshuffle",
+                  "decompress_onecore",
+                  "decompress_omp" ):
+        print(func)
+        runtest_lz4chunkdecoders( getattr( decoders, func ) )
 
-def testompblocked():
-    from bslz4decoders.ccodes.ompdecoders import omp_lz4_blocks
-    runtest_lz4blockdecoders(omp_lz4_blocks)
+def testblocked():
+    for func in ( "decompress_omp_blocks", ):
+        print(func)
+        runtest_lz4chunkdecoders( getattr( decoders, func ) )
 
 
 if __name__=="__main__":
-    print("onecore")
-    testonecore()
-    print("omp reading offsets")
-    testomp()
-    print("omp given offsets")
-    testompblocked()
+
+    if len(sys.argv) > 2:
+        TESTCASES = [ (sys.argv[1], sys.argv[2]), ]
+
+    if len(sys.argv) > 3:
+        RPT = int(sys.argv[3])
+
+    testchunkdecoders()
+    testblocked()

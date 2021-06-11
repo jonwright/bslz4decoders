@@ -5,7 +5,7 @@
 import os, sys
 import numpy as np, h5py
 
-from bslz4decoders.read_chunks import get_chunk, get_blocks
+from bslz4decoders.read_chunks import get_chunk
 
 import pycuda.autoinit, pycuda.driver, pycuda.gpuarray, pycuda.compiler
 
@@ -30,7 +30,6 @@ class BSLZ4CUDA:
         self.h5lz4dc   = self.mod.get_function("h5lz4dc")
         self.shuf_end = self.mod.get_function("simple_shuffle_end")
         self.copybytes = self.mod.get_function("copybytes")
-
         self.reset(  total_output_bytes, bpp, blocksize )
 
     def reset(self, total_output_bytes, bpp, blocksize):
@@ -121,17 +120,12 @@ class BSLZ4CUDA:
 
 def testcase( hname, dset, frm):
     print("Reading", hname, "::", dset, "[", frm, "]")
-    chunk, shape, dtyp  = get_chunk( hname, dset, frm )
-    total_output_elem  = shape[1]*shape[2]
-    total_output_bytes = total_output_elem*dtyp.itemsize
-    blocksize, blocks = get_blocks( chunk, shape, dtyp )
+    config, chunk  = get_chunk( hname, dset, frm )
+    blocksize, blocks = config.get_blocks( chunk )
 
-    output = np.empty( total_output_elem, dtyp )
-    decompressor = BSLZ4CUDA( total_output_bytes, dtyp.itemsize, blocksize )
-    decomp = decompressor( chunk, blocks, outarg=output ).view( dtyp ).reshape( (shape[1], shape[2]) )
-
-#    outputd = pycuda.gpuarray.empty( total_output_elem, dtyp )
-#    decomp2 = decompressor( chunk, blocks, outarg=outputd ).get().view( dtyp ).reshape( (shape[1], shape[2]) )
+    output = np.empty( config.output_nbytes , np.uint8 )
+    decompressor = BSLZ4CUDA( config.output_nbytes, config.dtype.itemsize, config.blocksize )
+    decomp = decompressor( chunk, blocks, outarg=output ).view(config.dtype).reshape(config.shape)
 
     ref = h5py.File( hname, 'r' )[dset][frm]
 

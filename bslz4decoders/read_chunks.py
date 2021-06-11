@@ -2,102 +2,94 @@
 
 import h5py, hdf5plugin, numpy as np, struct
 
-from bslz4decoders.ccodes import decoders, h5chunk
+from bslz4decoders.ccodes import decoders
+from bslz4decoders.decoders import BSLZ4ChunkConfig
 
-def get_frame_h5py( h5name, dset, frame ):
+# All the reading from h5py should be done in a single thread
+# We should have multiple threads that are reading from the same
+# file at the same time. Some kind of protection might be
+# needed..., perhaps:
+import threading
+# ... assert threading.current_thread() is threading.main_thread()
+#
+
+def get_frame_h5py( h5name, dsetname, frame ):
     """ returns h5name::/dset[frame] """
     with h5py.File(h5name, "r") as h5f:
-        frm = h5f[dset][frame]
+        frm = h5f[dsetname][frame]
     return frm
 
-def get_chunk( h5name, dset, frame, useh5py=True ):
-    """ returns the chunk behind h5name::/dset[frame] """
+def get_frames_h5py( h5name, dsetname,  firstframe=0, lastframe=None, stepframe=1 ):
+    """ Grabs one big blob of data
+    It is going to fill your memory if you ask for too many
+    """
+    with h5py.File(h5name, "r") as h5f:
+        dset = h5f[dsetname]
+        if lastframe is None:
+            assert len(dset.shape) == 3
+            lastframe = len(dset)
+        return dset[ firstframe : lastframe : stepframe ]
+
+def iter_frames_h5py( h5name, dsetname,  firstframe=0, lastframe=None, stepframe=1 ):
+    """ Returns one frame at a time """
+    with h5py.File(h5name, "r") as h5f:
+        dset = h5f[dsetname]
+        if lastframe is None:
+            assert len(dset.shape) == 3
+            lastframe = len(dset)
+        for i in range( firstframe, lastframe, stepframe ):
+            yield dset[ i ]
+
+def get_chunk( h5name, dsetname, frame ):
+    """ return the chunk behind h5name::/dset[frame] """
+    with h5py.File(h5name, "r") as h5f:
+        dset = h5f[dsetname]
+        assert len(dset.chunks) == 3
+        assert dset.chunks[0] == 1
+        assert dset.chunks[1] == dset.shape[1]
+        assert dset.chunks[2] == dset.shape[2]
+        filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
+        config = BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
+        return config, np.frombuffer( buffer, np.uint8 )
+
+
+def get_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
+    """ return the series of chunks  """
     with h5py.File(h5name, "r") as h5f:
         dset = h5f[dset]
         assert len(dset.chunks) == 3
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
-        if useh5py:
+        if lastframe is None:
+            lastframe = dset.shape[0]
+        chunks = []
+        config =  BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
+        for frame in range(firstframe, lastframe, stepframe):
             filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
-            buffer = np.frombuffer( buffer, dtype=np.uint8 )
-        else:        # inefficient
-            raise Exception("Not ready yet!")
-            buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
-                               np.uint8 )
-            csize = h5chunk.h5_read_direct( dset.id.id, frame, buffer )
-            buffer = buffer[:csize].copy()
-        return buffer, dset.shape, dset.dtype
+            chunks.append( np.frombuffer( buffer, np.uint8 ) )
+        return config, chunks
 
-def get_frames_h5py( h5name, dset ):
-    with h5py.File(h5name, "r") as h5f:
-        for frm in h5f[dset]:
-            yield frm
-
-def get_chunks( h5name, dset, useh5py=True ):
+def iter_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
+    """ return the series of chunks  """
     with h5py.File(h5name, "r") as h5f:
         dset = h5f[dset]
         assert len(dset.chunks) == 3
         assert dset.chunks[0] == 1
         assert dset.chunks[1] == dset.shape[1]
         assert dset.chunks[2] == dset.shape[2]
-        if not useh5py:
-            buffer = np.empty( dset.dtype.itemsize*dset.shape[1]*dset.shape[2]+1024,
-                               np.uint8 )
-        for frame in range(dset.shape[0]):
-            if useh5py:
-                filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
-                buffer = np.frombuffer( buffer, dtype=np.uint8 )
-            else:        # inefficient
-                raise Exception("Not ready yet!")
-                csize = h5chunk.h5_read_direct( dset.id.id, frame, buffer )
-                buffer = buffer[:csize].copy()
-            yield buffer, dset.shape, dset.dtype
+        if lastframe is None:
+            lastframe = dset.shape[0]
+        config = BSLZ4ChunkConfig( ( dset.shape[1], dset.shape[2]), dset.dtype )
+        for frame in range(firstframe, lastframe, stepframe):
+            filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
+            yield config, np.frombuffer( buffer, np.uint8 )
+
+def queue_chunks( q, h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
+    """ move this elsewhere ... """
+    assert threading.current_thread() is threading.main_thread()
+    for tup in get_chunks( h5name, dset ):
+        q.put( tup )
 
 
-def get_blocks( chunk, shape, dtyp ):
-    # We do this in python as it doesn't seem worth making a call back
-    # ... otherwise need to learn to call free on a numpy array
-    total_bytes, blocksize = struct.unpack_from("!QL", chunk, 0)
-    if blocksize == 0:
-        blocksize = 8192
-    nblocks =  (total_bytes + blocksize - 1) // blocksize
-    blocks = np.empty( nblocks, np.uint32 )
-    decoders.read_starts( chunk, dtyp.itemsize, blocksize, blocks )
-    return blocksize, blocks
-
-def bench( func, *args ):
-    start = timeit.default_timer()
-    func(*args)
-    end = timeit.default_timer()
-    print("%.6f /s"%(end-start), func.__name__, args)
-
-def benchiter( func, *args ):
-    start = timeit.default_timer()
-    frms = [frm for frm in func(*args)]
-    end = timeit.default_timer()
-    print("%.6f /s"%(end-start), func.__name__, args)
-
-
-
-if __name__=="__main__":
-    import sys
-    from bslz4decoders.test.testcases import testcases
-    # hum - wrong folder
-    if len(sys.argv) == 1:
-        hname = "bslz4testcases.h5"
-        dsets = [ "data_uint%d"%(i) for i in (8,16,32) ]
-    else:
-        hname = sys.argv[1]
-        dsets = [ d for d in sys.argv[2:] ]
-    import timeit, sys
-    for hname, d in testcases:
-        print()
-        bench( get_chunk, hname, d, 0 )
-        bench( get_frame_h5py, hname, d, 0 )
-        benchiter( get_chunks, hname, d )
-        benchiter( get_frames_h5py, hname, d )
-
-        chunk, shape, dtyp = get_chunk( hname, d, 0 )
-        bench( get_blocks, chunk, shape, dtyp )
 
