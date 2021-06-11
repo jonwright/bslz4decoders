@@ -91,25 +91,42 @@ if platform.system() == 'Windows':
 else:
     LZ4 = "lz4"
 
+    
 ext_modules = [ Extension( "h5chunk",
-                      sources = ["h5chunk.c", "h5chunkmodule.c", fortranobj],
-                      include_dirs  = incdirs,
-#                     define_macros = [('MAJOR_VERSION', '1')],
-                      libraries = ['hdf5'],
-                      library_dirs  = libdirs ),
-               Extension( "ompdecoders",
-                      sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
-                      include_dirs  = incdirs,
-                      libraries = [LZ4],
-                      library_dirs  = libdirs ),
+                           sources = ["h5chunk.c", "h5chunkmodule.c", fortranobj],
+                           include_dirs  = incdirs,
+                           libraries = ['hdf5'],
+                           library_dirs  = libdirs ),
+                Extension( "ompdecoders",
+                           sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
+                           define_macros = [('USEIPP', '1')],
+                           include_dirs  = incdirs,
+                           libraries = [LZ4],
+                           library_dirs  = libdirs ),
+                Extension( "ippompdecoders",
+                           sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
+                           define_macros = [('USEIPP', '1')],
+                           include_dirs  = incdirs,
+                           libraries = ['ippdc'],
+                           library_dirs  = libdirs ),
+                Extension( "decoders",
+                           sources = ["decoders.c", "decodersmodule.c", fortranobj],
+                           define_macros = [('USEIPP', '1')],
+                           include_dirs  = incdirs,
+                           libraries = [LZ4],
+                           library_dirs  = libdirs ),
+                Extension( "ippdecoders",
+                           sources = ["decoders.c", "decodersmodule.c", fortranobj],
+                           define_macros = [('USEIPP', '1')],
+                           include_dirs  = incdirs,
+                           libraries = ['ippdc'],
+                           library_dirs  = libdirs ),
+]
 
-               Extension( "decoders",
-                      sources = ["decoders.c", "decodersmodule.c", fortranobj],
-                      include_dirs  = incdirs,
-                      libraries = [LZ4],
-                      library_dirs  = libdirs ),
-                  ]
+setup( name = "ccodes" ,
+       ext_modules = ext_modules,
+       cmdclass = { 'build_ext' : build_ext_subclass },
+)
 
-setup( name = "ccodes" , ext_modules = ext_modules )
 
 

@@ -24,15 +24,19 @@ INCLUDES = """
 #include <string.h>   /* memcpy */
 #include <stdio.h>    /* print error message before killing process(!?!?) */
 
-#ifdef USEIPP
-#include <ippdc.h>    /* for intel ... going to need a platform build system */
-#endif
-
 """% ( __file__, time.ctime())
 
 
-LZ4H = """ #include <lz4.h>      /* assumes you have this already */
+LZ4H = """ 
+#ifdef USEIPP
+#warning using ipp
+#include <ippdc.h>    /* for intel ... going to need a platform build system */
+#else
+#warning not using ipp
+#include <lz4.h>      /* assumes you have this already */
+#endif
 """
+
 H5H = """#include <hdf5.h>     /* to grab chunks independently of h5py api (py27 issue) */
 """
 

@@ -94,7 +94,7 @@ def decompress_bitshuffle( chunk, config, output = None ):
 
 
 
-
+# FIXME : make this a decorator and wrap ipp libs
 def decompress_onecore( chunk, config, output = None ):
     """  One core decoding from our ccodes
     """
