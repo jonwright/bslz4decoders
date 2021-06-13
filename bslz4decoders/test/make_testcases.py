@@ -48,6 +48,30 @@ def make_testcases( hname) :
                 write_array( hname, dsname , ary )
 
 
+def make_blobtests( hname, dsname, method = "uniform15" ):
+    from bslz4decoders.ccodes.decoders import onecore_lz4
+    with h5py.File( hname, "r" ) as h5f:
+        name = dsname
+        for dtyp, label in ( ( np.uint8 , 'u8' ),
+                             ( np.uint16, 'u16' ),
+                             ( np.uint32, 'u32' ) ):
+            dsname = "_".join((name, label, method))
+            blob = h5f[dsname].id.read_direct_chunk( (0,0,0) )[1]
+            ref  = h5f[dsname][0]
+            with open( dsname + ".bslz4", "wb" ) as fout:
+                fout.write( blob )
+            with open( dsname + ".bs", "wb" ) as fout:
+                output = np.empty( ref.shape, ref.dtype )
+                onecore_lz4( np.frombuffer(blob, np.uint8) ,
+                             h5f[dsname].dtype.itemsize,
+                             output.ravel().view(np.uint8) )
+                fout.write( output.tobytes( ) ) # did numpy rename this yet?
+            with open( dsname + ".ref", "wb") as fout:
+                fout.write( ref.tobytes( ) )
+            
+            
+            
+
 if __name__=="__main__":
     hname = "bslz4testcases.h5"
     if len(sys.argv)>1 and sys.argv[1].tolower() == "more":
@@ -56,6 +80,7 @@ if __name__=="__main__":
         print("Removed", hname)
         os.remove(hname)
     make_testcases(hname)
+    make_blobtests(hname, "Primes" )
 
 
 
