@@ -99,34 +99,38 @@ ext_modules = [ Extension( "h5chunk",
                            library_dirs  = libdirs ),
                 Extension( "ompdecoders",
                            sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
-                           define_macros = [('USEIPP', '1')],
                            include_dirs  = incdirs,
                            libraries = [LZ4],
-                           library_dirs  = libdirs ),
-                Extension( "ippompdecoders",
-                           sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
-                           define_macros = [('USEIPP', '1')],
-                           include_dirs  = incdirs,
-                           libraries = ['ippdc'],
                            library_dirs  = libdirs ),
                 Extension( "decoders",
                            sources = ["decoders.c", "decodersmodule.c", fortranobj],
-                           define_macros = [('USEIPP', '1')],
                            include_dirs  = incdirs,
                            libraries = [LZ4],
                            library_dirs  = libdirs ),
-                Extension( "ippdecoders",
-                           sources = ["decoders.c", "decodersmodule.c", fortranobj],
-                           define_macros = [('USEIPP', '1')],
-                           include_dirs  = incdirs,
-                           libraries = ['ippdc'],
-                           library_dirs  = libdirs ),
 ]
+
+
+
+ipp_modules = [
+    Extension( "ippdecoders",
+               sources = ["decoders.c", "decodersmodule.c", fortranobj],
+               define_macros = [('USEIPP', '1')],
+               include_dirs  = incdirs,
+               libraries = ['ippdc'],
+               library_dirs  = libdirs ),
+    Extension( "ippompdecoders",
+               sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
+               define_macros = [('USEIPP', '1')],
+               include_dirs  = incdirs,
+               libraries = ['ippdc'],
+               library_dirs  = libdirs )
+    ]
+
+
+if "-IPP" in sys.argv:
+    ext_modules += ipp_modules
 
 setup( name = "ccodes" ,
        ext_modules = ext_modules,
        cmdclass = { 'build_ext' : build_ext_subclass },
 )
-
-
-
