@@ -448,5 +448,28 @@ inline __device__ void decompressStream(
   assert(comp_idx == comp_end);
 }
 
+__global__ void lz4DecompressBatchKernel(
+    const uint8_t* const* const device_in_ptrs,
+    const size_t* const device_in_bytes,
+    const int batch_size,
+    uint8_t* const* const device_out_ptrs)
+{
+  const int bid = blockIdx.x * DECOMP_CHUNKS_PER_BLOCK + threadIdx.y;
+
+  __shared__ uint8_t buffer[DECOMP_INPUT_BUFFER_SIZE * DECOMP_CHUNKS_PER_BLOCK];
+
+  if (bid < batch_size) {
+    uint8_t* const decomp_ptr = device_out_ptrs[bid];
+    const uint8_t* const comp_ptr = device_in_ptrs[bid];
+    const position_type chunk_length
+        = static_cast<position_type>(device_in_bytes[bid]);
+
+    decompressStream(
+        buffer + threadIdx.y * DECOMP_INPUT_BUFFER_SIZE,
+        decomp_ptr,
+        comp_ptr,
+        chunk_length);
+  }
+}
 
 #undef NDEBUG
