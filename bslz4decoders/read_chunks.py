@@ -15,80 +15,73 @@ import threading
 
 def get_frame_h5py( h5name, dsetname, frame ):
     """ returns h5name::/dset[frame] """
-    with h5py.File(h5name, "r") as h5f:
-        frm = h5f[dsetname][frame]
+    frm = h5py.File(h5name, "r")[dsetname][frame]
     return frm
 
 def get_frames_h5py( h5name, dsetname,  firstframe=0, lastframe=None, stepframe=1 ):
     """ Grabs one big blob of data
     It is going to fill your memory if you ask for too many
     """
-    with h5py.File(h5name, "r") as h5f:
-        dset = h5f[dsetname]
-        if lastframe is None:
-            assert len(dset.shape) == 3
-            lastframe = len(dset)
-        return dset[ firstframe : lastframe : stepframe ]
+    dset = h5py.File(h5name, "r")[dsetname]
+    if lastframe is None:
+        assert len(dset.shape) == 3
+        lastframe = len(dset)
+    return dset[ firstframe : lastframe : stepframe ]
 
 def iter_frames_h5py( h5name, dsetname,  firstframe=0, lastframe=None, stepframe=1 ):
     """ Returns one frame at a time """
-    with h5py.File(h5name, "r") as h5f:
-        dset = h5f[dsetname]
-        if lastframe is None:
-            assert len(dset.shape) == 3
-            lastframe = len(dset)
-        for i in range( firstframe, lastframe, stepframe ):
-            yield dset[ i ]
+    dset = h5py.File(h5name, "r")[dsetname]
+    if lastframe is None:
+        assert len(dset.shape) == 3
+        lastframe = len(dset)
+    for i in range( firstframe, lastframe, stepframe ):
+        yield dset[ i ]
 
 def get_chunk( h5name, dsetname, frame ):
     """ return the chunk behind h5name::/dset[frame] """
-    with h5py.File(h5name, "r") as h5f:
-        dset = h5f[dsetname]
-        assert len(dset.chunks) == 3
-        assert dset.chunks[0] == 1
-        assert dset.chunks[1] == dset.shape[1]
-        assert dset.chunks[2] == dset.shape[2]
-        filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
-        config = BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
-        return config, np.frombuffer( buffer, np.uint8 )
-
+    dset = h5py.File(h5name, "r")[dsetname]
+    assert len(dset.chunks) == 3
+    assert dset.chunks[0] == 1
+    assert dset.chunks[1] == dset.shape[1]
+    assert dset.chunks[2] == dset.shape[2]
+    filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
+    config = BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
+    return config, np.frombuffer( buffer, np.uint8 )
 
 def get_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
     """ return the series of chunks  """
-    with h5py.File(h5name, "r") as h5f:
-        dset = h5f[dset]
-        assert len(dset.chunks) == 3
-        assert dset.chunks[0] == 1
-        assert dset.chunks[1] == dset.shape[1]
-        assert dset.chunks[2] == dset.shape[2]
-        if lastframe is None:
-            lastframe = dset.shape[0]
-        chunks = []
-        config =  BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
-        for frame in range(firstframe, lastframe, stepframe):
-            filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
-            chunks.append( np.frombuffer( buffer, np.uint8 ) )
-        return config, chunks
+    dset = h5py.File(h5name, "r")[dset]
+    assert len(dset.chunks) == 3
+    assert dset.chunks[0] == 1
+    assert dset.chunks[1] == dset.shape[1]
+    assert dset.chunks[2] == dset.shape[2]
+    if lastframe is None:
+        lastframe = dset.shape[0]
+    chunks = []
+    config =  BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
+    for frame in range(firstframe, lastframe, stepframe):
+        filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
+        chunks.append( np.frombuffer( buffer, np.uint8 ) )
+    return config, chunks
 
 def iter_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
     """ return the series of chunks  """
-    with h5py.File(h5name, "r") as h5f:
-        dset = h5f[dset]
-        assert len(dset.chunks) == 3
-        assert dset.chunks[0] == 1
-        assert dset.chunks[1] == dset.shape[1]
-        assert dset.chunks[2] == dset.shape[2]
-        if lastframe is None:
-            lastframe = dset.shape[0]
-        config = BSLZ4ChunkConfig( ( dset.shape[1], dset.shape[2]), dset.dtype )
-        for frame in range(firstframe, lastframe, stepframe):
-            filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
-            yield config, np.frombuffer( buffer, np.uint8 )
+    dset = h5py.File(h5name, "r")[dset]
+    assert len(dset.chunks) == 3
+    assert dset.chunks[0] == 1
+    assert dset.chunks[1] == dset.shape[1]
+    assert dset.chunks[2] == dset.shape[2]
+    if lastframe is None:
+        lastframe = dset.shape[0]
+    config = BSLZ4ChunkConfig( ( dset.shape[1], dset.shape[2]), dset.dtype )
+    for frame in range(firstframe, lastframe, stepframe):
+        filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
+        yield config, np.frombuffer( buffer, np.uint8 )
 
 def queue_chunks( q, h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
     """ move this elsewhere ... """
     assert threading.current_thread() is threading.main_thread()
-    for tup in get_chunks( h5name, dset ):
+    for tup in iter_chunks( h5name, dset ):
         q.put( tup )
 
 

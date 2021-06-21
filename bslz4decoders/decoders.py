@@ -63,6 +63,15 @@ class BSLZ4ChunkConfig:
         read_starts( chunk, self.dtype.itemsize, blocksize, blocks )
         # does not mess about with self.blocksize
         return blocksize, blocks
+    
+    def last_blocksize( self ):
+        last = self.output_nbytes % self.blocksize
+        tocopy = last % ( self.dtype.itemsize * 8 )
+        last -= tocopy
+        return last
+    
+    def tocopy( self ):
+        return self.output_nbytes % ( self.dtype.itemsize * 8 )
 
     def __repr__(self):
         return "%s %s %d %d"%( repr(self.shape), repr(self.dtype),

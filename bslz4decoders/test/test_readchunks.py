@@ -22,7 +22,7 @@ def test_bench( testcases = None ):
     if testcases is None:
         from bslz4decoders.test.testcases import testcases
     for hname, d in testcases:
-        print()
+        print(hname, d)
         cnf, buf = read_chunks.get_chunk( hname, d, 0 )
         bench( cnf.get_blocks, buf )
         bench( read_chunks.get_chunk, hname, d, 0 )
@@ -35,4 +35,6 @@ def test_bench( testcases = None ):
 if __name__=="__main__":
     if len(sys.argv) == 3:
         testcases = [ (sys.argv[1], sys.argv[2]), ]
-    test_bench( )
+    else:
+        testcases = None
+    test_bench( testcases )
