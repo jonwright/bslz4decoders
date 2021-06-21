@@ -81,8 +81,9 @@ def iter_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
 def queue_chunks( q, h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
     """ move this elsewhere ... """
     assert threading.current_thread() is threading.main_thread()
-    for tup in iter_chunks( h5name, dset ):
+    for tup in iter_chunks( h5name, dset, firstframe, lastframe, stepframe ):
         q.put( tup )
+    q.put(None)
 
 
 
