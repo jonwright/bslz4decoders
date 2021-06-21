@@ -65,7 +65,8 @@ def testcuda():
         assert(sref == sgpu),  " ".join((repr(sref),repr(sdata)))
 
 if __name__=="__main__":
+    import sys
     if len(sys.argv) == 3:
         testcases = [ (sys.argv[1], sys.argv[2]), ]
 
-    test_cuda()
+    testcuda()
