@@ -9,6 +9,7 @@ from pycuda import gpuarray
 from pycuda.reduction import ReductionKernel
 
 
+
 def check_and_show( a1, a2 ):
     assert a1.shape == a2.shape, str(a1.shape)+str(a2.shape)
     assert a1.dtype == a2.dtype, str(a1.dtype)+str(a2.dtype)
@@ -22,7 +23,7 @@ def check_and_show( a1, a2 ):
         pl.show()
 
 
-def testcuda():
+def testcuda(testcases):
 
     gpu_sums = { 1 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned char *in" ),
             2 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned short *in" ),
@@ -32,7 +33,7 @@ def testcuda():
     frm = 0
     dc = None
     print("Getchunk Init GPUdc GPUsum DtoH Hsum H5pyRead Hsum")
-    for hname, dset in TESTCASES:
+    for hname, dset in testcases:
         t = [ default_timer()*1e3, ]
         config, chunk = get_chunk( hname, dset, frm)
         blocksize, blocks = config.get_blocks( chunk )
@@ -50,23 +51,24 @@ def testcuda():
         t.append( default_timer()*1e3 )
         sgpu = gpu_sums[ config.dtype.itemsize ]( out_gpu ).get()
         t.append( default_timer()*1e3 )
-        data = out_gpu.get()
-        sdata = data.sum( dtype = np.int64)
-        t.append( default_timer()*1e3 )
-        ref = get_frame_h5py( hname, dset, frm )
-        t.append( default_timer()*1e3 )
-        sref = ref.ravel().sum(dtype = np.int64)
-        t.append( default_timer()*1e3 )
+        if __debug__:
+            data = out_gpu.get()
+            sdata = data.sum( dtype = np.int64)
+            t.append( default_timer()*1e3 )
+            ref = get_frame_h5py( hname, dset, frm )
+            t.append( default_timer()*1e3 )
+            sref = ref.ravel().sum(dtype = np.int64)
+            t.append( default_timer()*1e3 )
+            check_and_show( ref, data )
+            assert(sref == sdata),  " ".join((repr(sref),repr(sdata)))
+            assert(sref == sgpu),  " ".join((repr(sref),repr(sdata)))
         dt = [t[i]-t[i-1] for i in range(1,len(t))]
         print(("%.3f ms, "*len(dt))%tuple(dt), hname, dset )
         # print(sref, sdata, type(sref), type(sdata))
-        check_and_show( ref, data )
-        assert(sref == sdata),  " ".join((repr(sref),repr(sdata)))
-        assert(sref == sgpu),  " ".join((repr(sref),repr(sdata)))
 
 if __name__=="__main__":
     import sys
     if len(sys.argv) == 3:
-        testcases = [ (sys.argv[1], sys.argv[2]), ]
+        TESTCASES = [ (sys.argv[1], sys.argv[2]), ]
 
-    testcuda()
+    testcuda(TESTCASES)
