@@ -40,7 +40,7 @@ def runtest_lz4blockdecoders( decoder, frame = 0 ):
         t1 = timeit.default_timer()
         for _ in range(RPT):
             config, chunk = read_chunks.get_chunk( h5name, dset, frame )
-            blocksize, blocks = config.get_blocks( chunk )
+            blocks = config.get_blocks( chunk )
             out = np.empty( config.shape, config.dtype )
             decoded = decoder( chunk, config, output=out )
         t2 = timeit.default_timer()

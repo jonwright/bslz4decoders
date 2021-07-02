@@ -51,18 +51,22 @@ class BSLZ4ChunkConfig:
         else:
             self.output_nbytes = shape[0]*shape[1]*dtype.itemsize
 
-    def get_blocks( self, chunk ):
-        # We do this in python as it doesn't seem worth making a call back
-        # ... otherwise need to learn to call free on a numpy array
-        total_bytes, blocksize = struct.unpack_from("!QL", chunk, 0)
-        if blocksize == 0:
-            blocksize = 8192
-        nblocks =  (total_bytes + blocksize - 1) // blocksize
-        assert self.output_nbytes == total_bytes, "chunk config mismatch:"+repr(self)
-        blocks = np.empty( nblocks, np.uint32 )
-        read_starts( chunk, self.dtype.itemsize, blocksize, blocks )
-        # does not mess about with self.blocksize
-        return blocksize, blocks
+    def get_blocks( self, chunk, blocks=None ):
+        """
+        allow blocks to be pre-allocated (e.g. pinned memory)
+        sets self.blocksize only if blocks is None
+        """
+        if blocks is None:
+            # We do this in python as it doesn't seem worth making a call back
+            # ... otherwise need to learn to call free on a numpy array
+            total_bytes, self.blocksize = struct.unpack_from("!QL", chunk, 0)
+            if self.blocksize == 0:
+                self.blocksize = 8192
+            nblocks =  (total_bytes + self.blocksize - 1) // self.blocksize
+            assert self.output_nbytes == total_bytes, "chunk config mismatch:"+repr(self)
+            blocks = np.empty( nblocks, np.uint32 )
+        read_starts( chunk, self.dtype.itemsize, self.blocksize, blocks )
+        return blocks
     
     def last_blocksize( self ):
         last = self.output_nbytes % self.blocksize
@@ -89,10 +93,10 @@ def decompress_bitshuffle( chunk, config, output = None ):
     if output is not None:
         o = output.ravel()
         tb, bs = struct.unpack_from("!QL", chunk, 0)
-        print("about to shuffle", config.shape, config.dtype, config.blocksize, tb, bs, o.nbytes)
+        print("about to shuffle", config.shape, np.dtype(config.dtype), config.blocksize, tb, bs, o.nbytes)
         print(len(chunk), type(chunk))
         r = bitshuffle.decompress_lz4( chunk[12:], config.shape,
-                                          config.dtype, config.blocksize )
+                                       np.dtype(config.dtype), config.blocksize )
         print("back from shuffle")
         o[:] = r
     else:
@@ -130,7 +134,7 @@ def decompress_omp( chunk, config, output = None ):
 
 
 def decompress_omp_blocks( chunk, config,
-                           offsets=None, blocksize=None,
+                           offsets=None,
                            output = None ):
     """  Openmp decoding from our ccodes module
     (In the long run - we are expecting the offsets to be cached sonewhere)
@@ -139,12 +143,9 @@ def decompress_omp_blocks( chunk, config,
     if output is None:
         output = np.empty( config.shape, config.dtype )
     if offsets is None:
-        blocksize, offsets = config.get_blocks( achunk )
-
-    if blocksize is None:
-        blocksize = config.blocksize
+        offsets = config.get_blocks( achunk )
     err = omp_lz4_blocks( achunk , config.dtype.itemsize,
-                          blocksize, offsets, output.view( np.uint8 ) )
+                          config.blocksize, offsets, output.view( np.uint8 ) )
     if err:
         raise Exception("Decoding error")
     # TODO: put the bitshuffle into C !

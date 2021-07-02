@@ -36,16 +36,16 @@ def testcuda(testcases):
     for hname, dset in testcases:
         t = [ default_timer()*1e3, ]
         config, chunk = get_chunk( hname, dset, frm)
-        blocksize, blocks = config.get_blocks( chunk )
+        blocks = config.get_blocks( chunk )
         nbytes = config.output_nbytes
         t.append( default_timer()*1e3)
         if dc is None:
-            dc = BSLZ4CUDA( nbytes, config.dtype.itemsize, blocksize )
+            dc = BSLZ4CUDA( nbytes, config.dtype.itemsize, config.blocksize )
             out_gpu = gpuarray.empty( config.shape, dtype = config.dtype )
         else:
             if nbytes != out_gpu.nbytes:
                 out_gpu = gpuarray.empty( config.shape, dtype = config.dtype )
-                dc.reset( config.output_nbytes, config.dtype.itemsize, blocksize )
+                dc.reset( config.output_nbytes, config.dtype.itemsize, config.blocksize )
         t.append( default_timer()*1e3 )
         _ = dc( chunk, blocks, out_gpu )
         t.append( default_timer()*1e3 )

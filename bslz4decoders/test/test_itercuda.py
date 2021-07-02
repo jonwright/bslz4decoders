@@ -1,10 +1,10 @@
 
 from bslz4decoders.lz4dc_cuda import BSLZ4CUDA
-from bslz4decoders.read_chunks import iter_chunks
+from bslz4decoders.read_chunks import iter_chunks, get_frame_h5py
 from bslz4decoders.test.testcases import testcases as TESTCASES
 
 from timeit import default_timer
-import numpy as np
+import numpy as np, pylab as pl
 from pycuda import gpuarray
 from pycuda.reduction import ReductionKernel
 
@@ -29,21 +29,20 @@ def testcuda(hname, dset):
             4 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned int *in" ),
     }
     out_gpu = None
-    frm = 0
     dc = None
     print("Getchunk Init GPUdc GPUsum DtoH Hsum H5pyRead Hsum")
-    for config,chunk in iter_chunks( hname, dset ):
+    for frm, (config,chunk ) in enumerate( iter_chunks( hname, dset ) ):
         t = [ default_timer()*1e3, ]
-        blocksize, blocks = config.get_blocks( chunk )
+        blocks = config.get_blocks( chunk )
         nbytes = config.output_nbytes
         t.append( default_timer()*1e3)
         if dc is None:
-            dc = BSLZ4CUDA( nbytes, config.dtype.itemsize, blocksize )
+            dc = BSLZ4CUDA( nbytes, config.dtype.itemsize, config.blocksize )
             out_gpu = gpuarray.empty( config.shape, dtype = config.dtype )
         else:
             if nbytes != out_gpu.nbytes:
                 out_gpu = gpuarray.empty( config.shape, dtype = config.dtype )
-                dc.reset( config.output_nbytes, config.dtype.itemsize, blocksize )
+                dc.reset( config.output_nbytes, config.dtype.itemsize, config.blocksize )
         t.append( default_timer()*1e3 )
         _ = dc( chunk, blocks, out_gpu )
         t.append( default_timer()*1e3 )
@@ -60,9 +59,9 @@ def testcuda(hname, dset):
             check_and_show( ref, data )
             assert(sref == sdata),  " ".join((repr(sref),repr(sdata)))
             assert(sref == sgpu),  " ".join((repr(sref),repr(sdata)))
-        dt = [t[i]-t[i-1] for i in range(1,len(t))]
-        #print(("%.3f ms, "*len(dt))%tuple(dt), hname, dset )
-        # print(sref, sdata, type(sref), type(sdata))
+            dt = [t[i]-t[i-1] for i in range(1,len(t))]
+            print(("%.3f ms, "*len(dt))%tuple(dt), hname, dset )
+            # print(sref, sdata, type(sref), type(sdata))
 
 if __name__=="__main__":
     import sys
