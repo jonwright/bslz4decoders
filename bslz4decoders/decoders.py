@@ -4,6 +4,7 @@ import struct
 import bitshuffle
 import numpy as np
 
+from bslz4decoders.ccodes.h5chunk import h5_dsinfo
 from bslz4decoders.ccodes.decoders import read_starts, onecore_lz4
 from bslz4decoders.ccodes.ompdecoders import omp_lz4, omp_lz4_blocks
 
@@ -38,15 +39,22 @@ decompress_lz4(...)
 """
 
 class BSLZ4ChunkConfig:
-    """ Wrapper over a binary blob that comes from a hdf5 file """
+    """ Metadata needed for decoding a chunk
 
-    __slots__ = [ "shape", "dtype", "blocksize", "output_nbytes" ]
+    shape = shape of this chunk
+    bpp = bytes per pixel
+    output_nbytes = shape * bpp
+    blocksize = transpose blocksize for bitshuffle
+    npytype = numpy dtype == convenience
+    """
+    __slots__ = [ "shape", "dtype", "blocksize", "output_nbytes", "bpp" ]
 
-    def __init__(self, shape, dtype, blocksize=8192, output_nbytes=0 ):
+    def __init__(self, shape, dtype, blocksize=8192, output_nbytes=None ):
         self.shape = shape
         self.dtype = dtype
+        self.bpp = dtype.itemsize
         self.blocksize = blocksize
-        if output_nbytes:
+        if output_nbytes is not None:
             self.output_nbytes = output_nbytes
         else:
             self.output_nbytes = shape[0]*shape[1]*dtype.itemsize
@@ -81,6 +89,25 @@ class BSLZ4ChunkConfig:
         return "%s %s %d %d"%( repr(self.shape), repr(self.dtype),
                             self.blocksize, self.output_nbytes)
 
+    
+class BSLZ4ChunkConfigDirect( BSLZ4ChunkConfig ):
+    def __init__(self, dsid):
+        dsinfo = np.zeros( 16, np.int64 )
+        err = h5_dsinfo( dsid, dsinfo )
+        self.bpp, classtype, signed, self.output_nbytes, ndims = dsinfo[:5]
+        assert ndims == 3
+        shape = dsinfo[5:5+ndims]
+        self.shape = shape[1], shape[2]
+        self.nframes = shape[0]
+        #            H5T_INTEGER          = 0,   /*integer types                              */
+        #            H5T_FLOAT            = 1,   /*floating-point types                       */
+        if classtype == 0:
+            self.dtype = np.dtype( 'iu'[signed] + str( self.bpp ) )
+        elif classtype == 1:
+            self.dtype = np.dtype( 'f' + str( self.bpp ) )
+        
+    
+    
 def decompress_bitshuffle( chunk, config, output = None ):
     """  Generic bitshuffle decoder depending on the
     bitshuffle library from https://github.com/kiyo-masui/bitshuffle

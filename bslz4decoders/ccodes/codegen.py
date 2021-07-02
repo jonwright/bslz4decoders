@@ -293,6 +293,35 @@ FUNCS['h5_close_dset'] = cfunc(
     """
     return H5Dclose( dset );
     """ )
+FUNCS['h5_dsinfo'] = cfunc( # read itemsize, classtype, signed, total_bytes, ndims, dims (skip byteorder)
+    "size_t h5_dsinfo",
+    ["int64_t dataset_id", "int64_t * dsinfo", "int dsinfo_length"],
+    """
+    hid_t h5t = H5Dget_type( dataset_id );
+    if (h5t < 0) return h5t;
+    dsinfo[0] = H5Tget_size( h5t );
+    dsinfo[1] = H5Tget_class( h5t );
+    if (dsinfo[1] == H5T_INTEGER){
+        dsinfo[2] = H5Tget_sign( h5t );
+    } else {
+        dsinfo[2] = 0;
+    }
+    H5Tclose( h5t );
+    hid_t h5s = H5Dget_space( dataset_id );
+    if (h5s < 0) return h5s;
+    dsinfo[4] = H5Sget_simple_extent_ndims( h5s );
+    if ( (dsinfo[4] + 4) > dsinfo_length ){
+       H5Sclose( h5s );
+       return -1;
+    }
+    int err = H5Sget_simple_extent_dims( h5s, &dsinfo[5], NULL );
+    H5Sclose( h5s );
+    int64_t nb = 1;
+    for( int i = 0; i < dsinfo[4]; i++ ) nb *= dsinfo[5+i];
+    dsinfo[3] = nb;
+    return err;
+    """
+    )
 FUNCS['h5_chunk_size'] = cfunc(
     "size_t h5_chunk_size", # name, args, body
     ["int64_t dataset_id", "int frame" ],
