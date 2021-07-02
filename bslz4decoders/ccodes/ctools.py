@@ -126,6 +126,7 @@ class cfunc:
             else:
                 decl = TMAP[m] + ' :: %s'%(a)
             lines.append( decl  )
+        lines.append("threadsafe") # hmm
         if sub:
             lines.append( "end subroutine %s%(fname)" )
         else:
