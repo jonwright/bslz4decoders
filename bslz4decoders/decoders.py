@@ -89,20 +89,14 @@ def decompress_bitshuffle( chunk, config, output = None ):
            config, gives the shape and dtype
     returns: decompressed data
     """
-    # FIXME: this bombs on windows.
+    r = bitshuffle.decompress_lz4( chunk[12:],
+                                   config.shape,
+                                   np.dtype(config.dtype),
+                                   config.blocksize // config.dtype.itemsize )
     if output is not None:
-        o = output.ravel()
-        tb, bs = struct.unpack_from("!QL", chunk, 0)
-        print("about to shuffle", config.shape, np.dtype(config.dtype), config.blocksize, tb, bs, o.nbytes)
-        print(len(chunk), type(chunk))
-        r = bitshuffle.decompress_lz4( chunk[12:], config.shape,
-                                       np.dtype(config.dtype), config.blocksize )
-        print("back from shuffle")
-        o[:] = r
+        output[:] = r
     else:
-        output = bitshuffle.decompress_lz4( chunk[12:], config.shape,
-                                          config.dtype, config.blocksize )
-        print("back from shuffle")
+        output = r
     return output
 
 

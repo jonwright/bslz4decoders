@@ -55,7 +55,7 @@ def runtest_lz4blockdecoders( decoder, frame = 0 ):
 
 
 def testchunkdecoders():
-    for func in ( # "decompress_bitshuffle",
+    for func in ( "decompress_bitshuffle",
                   "decompress_onecore",
                   "decompress_omp" ):
         print(func)
