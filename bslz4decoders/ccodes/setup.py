@@ -19,8 +19,11 @@ import numpy, numpy.f2py
 
 
 f2pypath = os.path.split( numpy.f2py.__file__)[0]
-fortranobj = os.path.join( f2pypath, 'src', 'fortranobject.c' )
 fortraninc = os.path.join( f2pypath, 'src' )
+fortranobj = os.path.join( fortraninc, 'fortranobject.c' )
+
+bsinc = os.path.join( os.path.dirname(__file__), "bitshuffle_extract" )
+bsobj = os.path.join( bsinc, "bitshuffle_core.c" )
 
 assert os.path.exists( fortranobj )
 
@@ -65,7 +68,7 @@ class build_ext_subclass( build_ext.build_ext ):
 
 
 def compile_paths( place ):
-    incdirs = [ numpy.get_include(), fortraninc ]
+    incdirs = [ numpy.get_include(), fortraninc, bsinc ]
     libdirs = [ ]
     cp = place
     for root in [os.path.join( cp, "Library" ), cp ]:
@@ -103,7 +106,7 @@ ext_modules = [ Extension( "h5chunk",
                            libraries = [LZ4],
                            library_dirs  = libdirs ),
                 Extension( "decoders",
-                           sources = ["decoders.c", "decodersmodule.c", fortranobj],
+                           sources = ["decoders.c", "decodersmodule.c", fortranobj, bsobj],
                            include_dirs  = incdirs,
                            libraries = [LZ4],
                            library_dirs  = libdirs ),

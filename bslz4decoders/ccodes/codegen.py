@@ -26,6 +26,9 @@ INCLUDES = """
 
 """% ( __file__, time.ctime())
 
+BSH = """
+#include "bitshuffle_core.h"
+"""
 
 LZ4H = """ 
 #ifdef USEIPP
@@ -74,9 +77,12 @@ chunk_args = [  "const uint8_t * compressed",
 # To write output data
 output_args = [ "uint8_t * output",
                 "size_t output_length" ]
+# Scratch space as shuffle is not inplace
+shuf_args = [ "uint8_t * tmp", "size_t tmp_length" ]
+
 # Same as for chunks, but includes an array of blocks.
 # These point to the 4 byte BE int which prefix each lz4 block.
-blocklist_args = chunk_args +  [ "int blocksize", "uint32_t * blocks", "int blocks_length" ]
+blocklist_args = chunk_args +  [ "size_t blocksize", "uint32_t * blocks", "int blocks_length" ]
 
 # What follows are a series of small fragments of C code that we will paste together
 # later.
@@ -154,11 +160,11 @@ lz4decoders = cfragments(
                                          &output[i * blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) error = 1;
 #else
-        int ret = LZ4_decompress_safe(  compressed + blocks[i] + 4u,
-                                           output + i * blocksize,
+        int ret = LZ4_decompress_safe(  (char*)( compressed + blocks[i] + 4u),
+                                        (char*)(output + i * blocksize),
                                            (int) READ32BE( compressed + blocks[i] ),
                                            blocksize );
-        if ( CHECK_RETURN_VALS && (ret != blocksize)) error = 1;
+        if ( CHECK_RETURN_VALS && (ret != (int) blocksize)) error = 1;
 #endif
     }
     if (error) ERR("Error decoding LZ4");
@@ -178,8 +184,8 @@ lz4decoders = cfragments(
                                          (Ipp8u*) &output[(blocks_length-1) * blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
 #else
-      int ret = LZ4_decompress_safe( compressed + blocks[blocks_length-1] + 4u,
-                                     output + (blocks_length-1) * blocksize,
+      int ret = LZ4_decompress_safe( (char* )compressed + blocks[blocks_length-1] + 4u,
+                                     (char*) (output + (blocks_length-1) * blocksize),
                                      nbytes,
                                      lastblock );
       if ( CHECK_RETURN_VALS && ( ret != lastblock ) ) ERR("Error decoding last LZ4 block");
@@ -187,9 +193,12 @@ lz4decoders = cfragments(
       }
     }
     """),
-    # without using the blocks
-    onecore_lz4 = cfrag("""
+    # Also do the bitshuffle inside this loop (e.g. from L1)
+    onecore_bslz4 = cfrag("""
     int p = 12;
+    if( tmp_length < blocksize ){
+       return -101;
+    }
     for( int i = 0; i < blocks_length - 1 ; ++i ){
        int nbytes = (int) READ32BE( &compressed[p] );
 #ifdef USEIPP
@@ -198,12 +207,16 @@ lz4decoders = cfragments(
                                         (Ipp8u*) &output[i * blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
 #else
-       int ret = LZ4_decompress_safe( &compressed[p + 4],
-                                      &output[i * blocksize],
+       int ret = LZ4_decompress_safe( (char*) &compressed[p + 4],
+                                      (char*) &output[i * blocksize],
                                       nbytes,
                                       blocksize );
       if ( CHECK_RETURN_VALS && ( ret != blocksize ) ) ERR("Error LZ4 block");
 #endif
+      /* bitshuffle here */
+      int64_t bref;
+      bref = bshuf_trans_byte_bitrow_elem( &output[i * blocksize], tmp, blocksize/itemsize, itemsize );
+      bref =  bshuf_shuffle_bit_eightelem( tmp, &output[i * blocksize], blocksize/itemsize, itemsize );
       p = p + nbytes + 4;
     }
     /* last block, might not be full blocksize */
@@ -217,29 +230,35 @@ lz4decoders = cfragments(
 
       int nbytes = (int) READ32BE( &compressed[p] );
 #ifdef USEIPP
-      int bsize = blocksize;
+      int bsize = lastblock;
       IppStatus ret = ippsDecodeLZ4_8u( (Ipp8u*) &compressed[p + 4], nbytes,
                                         (Ipp8u*) &output[(blocks_length-1)* blocksize], &bsize );
       if ( CHECK_RETURN_VALS && ( ret != ippStsNoErr ) ) ERR("Error LZ4 block");
 #else
-      int ret = LZ4_decompress_safe( &compressed[p + 4],
-                                     &output[(blocks_length-1) * blocksize],
+      int ret = LZ4_decompress_safe( (char*) &compressed[p + 4],
+                                     (char*) &output[(blocks_length-1) * blocksize],
                                      nbytes,
                                      lastblock );
       if ( CHECK_RETURN_VALS && ( ret != lastblock ) ) ERR("Error decoding last LZ4 block");
 #endif
+      /* bitshuffle here */
+      int64_t bref;
+      bref = bshuf_trans_byte_bitrow_elem( &output[(blocks_length-1) * blocksize], tmp, lastblock/itemsize, itemsize );
+      bref =  bshuf_shuffle_bit_eightelem( tmp, &output[(blocks_length-1) * blocksize], lastblock/itemsize, itemsize );
     }
+    return 0;
     """),
+    
 )
 
 
-FUNCS['onecore_lz4_func'] = cfunc(
-    "int onecore_lz4", chunk_args + output_args,
+FUNCS['onecore_bslz4_func'] = cfunc(
+    "int onecore_bslz4", chunk_args + output_args + shuf_args,
     (chunkdecoder+lz4decoders)(
         "total_length" ,
         "read_blocksize" ,
         "blocks_length",
-        "onecore_lz4") )
+        "onecore_bslz4") )
 
 FUNCS['omp_lz4_make_starts_func'] = cfunc(
     "int omp_lz4", chunk_args + output_args,
@@ -405,7 +424,7 @@ def main( testcompile = False ):
         FUNCS.pop( name )
 
     write_pyf("decoders" , "decoders.c", FUNCS )
-    write_funcs("decoders.c" , FUNCS, INCLUDES + LZ4H, MACROS )
+    write_funcs("decoders.c" , FUNCS, INCLUDES + LZ4H + BSH, MACROS )
 
 
     if testcompile:

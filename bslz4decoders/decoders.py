@@ -5,7 +5,7 @@ import bitshuffle
 import numpy as np
 
 from bslz4decoders.ccodes.h5chunk import h5_dsinfo
-from bslz4decoders.ccodes.decoders import read_starts, onecore_lz4
+from bslz4decoders.ccodes.decoders import read_starts, onecore_bslz4
 from bslz4decoders.ccodes.ompdecoders import omp_lz4, omp_lz4_blocks
 
 
@@ -128,18 +128,18 @@ def decompress_bitshuffle( chunk, config, output = None ):
 
 
 
-# FIXME : make this a decorator and wrap ipp libs
 def decompress_onecore( chunk, config, output = None ):
     """  One core decoding from our ccodes
     """
     if output is None:
         output = np.empty( config.shape, config.dtype )
-    err = onecore_lz4( np.asarray(chunk) ,
-                    config.dtype.itemsize, output.view( np.uint8 ) )
+    tmp = np.empty( config.blocksize, np.uint8 )
+    err = onecore_bslz4( np.asarray(chunk) ,
+                         config.dtype.itemsize, output.view( np.uint8 ), tmp )
     if err:
         raise Exception("Decoding error")
     # TODO: put the bitshuffle into C !
-    return bitshuffle.bitunshuffle( output.view(config.dtype) ).reshape( config.shape )
+    return output.view(config.dtype).reshape( config.shape )
 
 
 def decompress_omp( chunk, config, output = None ):

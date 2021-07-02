@@ -28,6 +28,7 @@ def test_bench( testcases = None ):
         bench( read_chunks.get_chunk, hname, d, 0 )
         bench( read_chunks.get_frame_h5py, hname, d, 0 )
         benchiter( read_chunks.iter_chunks, hname, d )
+        benchiter( read_chunks.iter_h5chunks, hname, d )
         benchiter( read_chunks.iter_frames_h5py, hname, d )
         benchiter( read_chunks.get_chunks, hname, d )
         benchiter( read_chunks.get_frames_h5py, hname, d )

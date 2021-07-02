@@ -17,7 +17,8 @@ def runtest_lz4chunkdecoders( decoder, frame = 0, rpt = 10 ):
         t1 = timeit.default_timer()
         for _ in range(RPT):
             config, chunk = read_chunks.get_chunk( h5name, dset, frame )
-            out = np.empty( config.shape, config.dtype )
+            if out is None:
+                out = np.empty( config.shape, config.dtype )
             decoded = decoder( chunk, config, output = out )
         t2 = timeit.default_timer()
         if not (decoded == ref).all():
@@ -38,10 +39,13 @@ def runtest_lz4blockdecoders( decoder, frame = 0 ):
         for _ in range(RPT):
             ref = read_chunks.get_frame_h5py( h5name, dset, frame )
         t1 = timeit.default_timer()
+        out = None
+        t1 = timeit.default_timer()
         for _ in range(RPT):
             config, chunk = read_chunks.get_chunk( h5name, dset, frame )
             blocks = config.get_blocks( chunk )
-            out = np.empty( config.shape, config.dtype )
+            if out is None:
+                out = np.empty( config.shape, config.dtype )
             decoded = decoder( chunk, config, output=out )
         t2 = timeit.default_timer()
         if not (decoded == ref).all():

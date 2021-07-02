@@ -61,6 +61,7 @@ TMAP = {
     'uint64_t': 'integer(kind=-8)',
     'int': 'integer(kind=4)', # doubtful
     'size_t': 'integer(kind=8)', # surely wrong
+    'size_t*' : 'integer(kind=8), intent(out)',
 }
 
 class cfunc:
@@ -107,7 +108,7 @@ class cfunc:
             a = tokens[-1]
             m = " ".join([ t for t in tokens[:-1] if t not in ('const','*')])
             t = " ".join(tokens[:-1])
-            if t.find("*")>0 and t.find("char*")<0:
+            if t.find("*")>0 and t.find(" *")>0:
                 if t.find("const")>=0:
                     intent = 'intent(in)'
                 else:
