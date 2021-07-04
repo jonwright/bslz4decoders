@@ -4,7 +4,7 @@
    Edit this to change the original :
      codegen.py
    Created on :
-     Sun Jul  4 16:39:07 2021
+     Sun Jul  4 17:36:17 2021
    Code generator written by Jon Wright.
 */
 
@@ -43,16 +43,14 @@
 
 #define CHECK_RETURN_VALS 1
 /* Signature for onecore_bslz4_func */
-int onecore_bslz4(const uint8_t *, size_t, int, uint8_t *, size_t, uint8_t *,
-                  size_t);
+int onecore_bslz4(const uint8_t *, size_t, int, uint8_t *, size_t);
 /* Signature for print_offsets_func */
 int print_offsets(const uint8_t *, size_t, int);
 /* Signature for read_starts_func */
 int read_starts(const uint8_t *, size_t, int, size_t, uint32_t *, int);
 /* Definition for onecore_bslz4_func */
 int onecore_bslz4(const uint8_t *compressed, size_t compressed_length,
-                  int itemsize, uint8_t *output, size_t output_length,
-                  uint8_t *tmp, size_t tmp_length) {
+                  int itemsize, uint8_t *output, size_t output_length) {
   /* begin: total_length */
 
   size_t total_output_length;
@@ -78,9 +76,10 @@ int onecore_bslz4(const uint8_t *compressed, size_t compressed_length,
   /* begin: onecore_bslz4 */
 
   int p = 12;
-  if (tmp_length < blocksize) {
+  if (blocksize > 8192) {
     return -101;
   }
+  char tmp[8192];
   for (int i = 0; i < blocks_length - 1; ++i) {
     int nbytes = (int)READ32BE(&compressed[p]);
 #ifdef USEIPP
@@ -98,9 +97,9 @@ int onecore_bslz4(const uint8_t *compressed, size_t compressed_length,
 #endif
     /* bitshuffle here */
     int64_t bref;
-    bref = bshuf_trans_byte_bitrow_elem(&output[i * blocksize], tmp,
+    bref = bshuf_trans_byte_bitrow_elem(&output[i * blocksize], &tmp[0],
                                         blocksize / itemsize, itemsize);
-    bref = bshuf_shuffle_bit_eightelem(tmp, &output[i * blocksize],
+    bref = bshuf_shuffle_bit_eightelem(&tmp[0], &output[i * blocksize],
                                        blocksize / itemsize, itemsize);
     p = p + nbytes + 4;
   }
@@ -132,8 +131,8 @@ int onecore_bslz4(const uint8_t *compressed, size_t compressed_length,
     int64_t bref;
     bref =
         bshuf_trans_byte_bitrow_elem(&output[(blocks_length - 1) * blocksize],
-                                     tmp, lastblock / itemsize, itemsize);
-    bref = bshuf_shuffle_bit_eightelem(tmp,
+                                     &tmp[0], lastblock / itemsize, itemsize);
+    bref = bshuf_shuffle_bit_eightelem(&tmp[0],
                                        &output[(blocks_length - 1) * blocksize],
                                        lastblock / itemsize, itemsize);
   }

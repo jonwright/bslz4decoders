@@ -78,7 +78,7 @@ chunk_args = [  "const uint8_t * compressed",
 output_args = [ "uint8_t * output",
                 "size_t output_length" ]
 # Scratch space as shuffle is not inplace
-shuf_args = [ "uint8_t * tmp", "size_t tmp_length" ]
+# moved to stack ... # shuf_args = [ "uint8_t * tmp", "size_t tmp_length" ]
 
 # Same as for chunks, but includes an array of blocks.
 # These point to the 4 byte BE int which prefix each lz4 block.
@@ -151,13 +151,15 @@ lz4decoders = cfragments(
     omp_bslz4 = cfrag("""
     /* allow user to set the number of threads */
     if ( num_threads == 0 ) num_threads = omp_get_max_threads();
-    if ( ( blocksize * num_threads ) > tmp_length ) return -1;
+    if ( blocksize > 8192 ) return -99; /* fixed the stack space */
     int error=0;
     {
     int i; /* msvc does not let you put this inside the for */
-#pragma omp parallel for num_threads(num_threads) shared(error)
+#pragma omp parallel num_threads(num_threads) shared(error)
+    {
+    char tltmp[8192]; /* thread local */
+#pragma omp for 
     for(  i = 0; i < blocks_length-1; i++ ){
-      int t0 = omp_get_thread_num() * blocksize;
 #ifdef USEIPP
       int bsize = blocksize;
       IppStatus ret = ippsDecodeLZ4_8u( (Ipp8u*) &compressed[blocks[i] + 4u], (int) READ32BE( compressed + blocks[i] ),
@@ -172,9 +174,11 @@ lz4decoders = cfragments(
 #endif
       /* bitshuffle here */
       int64_t bref;
-      bref = bshuf_trans_byte_bitrow_elem( &output[i * blocksize], &tmp[t0], blocksize/itemsize, itemsize );
-      bref =  bshuf_shuffle_bit_eightelem( &tmp[t0], &output[i * blocksize], blocksize/itemsize, itemsize );
-    } /* end parallel loop */
+      bref = bshuf_trans_byte_bitrow_elem( &output[i * blocksize], &tltmp[0], blocksize/itemsize, itemsize );
+      bref =  bshuf_shuffle_bit_eightelem( &tltmp[0], &output[i * blocksize], blocksize/itemsize, itemsize );
+    }
+    }
+ /* end parallel loop */
     if (error) ERR("Error decoding LZ4");
     /* last block, might not be full blocksize */
     {
@@ -200,17 +204,19 @@ lz4decoders = cfragments(
 #endif
       /* bitshuffle here */
       int64_t bref;
-      bref = bshuf_trans_byte_bitrow_elem( &output[(blocks_length-1) * blocksize], &tmp[0], lastblock/itemsize, itemsize );
-      bref =  bshuf_shuffle_bit_eightelem( &tmp[0], &output[(blocks_length-1) * blocksize], lastblock/itemsize, itemsize );
+      char tltmp[8192]; /* thread local */
+      bref = bshuf_trans_byte_bitrow_elem( &output[(blocks_length-1) * blocksize], &tltmp[0], lastblock/itemsize, itemsize );
+      bref =  bshuf_shuffle_bit_eightelem( &tltmp[0], &output[(blocks_length-1) * blocksize], lastblock/itemsize, itemsize );
       }
     }
     """),
     # Also do the bitshuffle inside this loop (e.g. from L1)
     onecore_bslz4 = cfrag("""
     int p = 12;
-    if( tmp_length < blocksize ){
+    if(  blocksize > 8192 ){
        return -101;
     }
+    char tmp[8192];
     for( int i = 0; i < blocks_length - 1 ; ++i ){
        int nbytes = (int) READ32BE( &compressed[p] );
 #ifdef USEIPP
@@ -227,8 +233,8 @@ lz4decoders = cfragments(
 #endif
       /* bitshuffle here */
       int64_t bref;
-      bref = bshuf_trans_byte_bitrow_elem( &output[i * blocksize], tmp, blocksize/itemsize, itemsize );
-      bref =  bshuf_shuffle_bit_eightelem( tmp, &output[i * blocksize], blocksize/itemsize, itemsize );
+      bref = bshuf_trans_byte_bitrow_elem( &output[i * blocksize], &tmp[0], blocksize/itemsize, itemsize );
+      bref =  bshuf_shuffle_bit_eightelem( &tmp[0], &output[i * blocksize], blocksize/itemsize, itemsize );
       p = p + nbytes + 4;
     }
     /* last block, might not be full blocksize */
@@ -255,8 +261,8 @@ lz4decoders = cfragments(
 #endif
       /* bitshuffle here */
       int64_t bref;
-      bref = bshuf_trans_byte_bitrow_elem( &output[(blocks_length-1) * blocksize], tmp, lastblock/itemsize, itemsize );
-      bref =  bshuf_shuffle_bit_eightelem( tmp, &output[(blocks_length-1) * blocksize], lastblock/itemsize, itemsize );
+      bref = bshuf_trans_byte_bitrow_elem( &output[(blocks_length-1) * blocksize], &tmp[0], lastblock/itemsize, itemsize );
+      bref =  bshuf_shuffle_bit_eightelem( &tmp[0], &output[(blocks_length-1) * blocksize], lastblock/itemsize, itemsize );
     }
     return 0;
     """),
@@ -265,7 +271,7 @@ lz4decoders = cfragments(
 
 
 FUNCS['onecore_bslz4_func'] = cfunc(
-    "int onecore_bslz4", chunk_args + output_args + shuf_args,
+    "int onecore_bslz4", chunk_args + output_args,
     (chunkdecoder+lz4decoders)(
         "total_length" ,
         "read_blocksize" ,
@@ -273,7 +279,7 @@ FUNCS['onecore_bslz4_func'] = cfunc(
         "onecore_bslz4") )
 
 FUNCS['omp_bslz4_make_starts_func'] = cfunc(
-    "int omp_bslz4", chunk_args + output_args + shuf_args + ['int num_threads',],
+    "int omp_bslz4", chunk_args + output_args + ['int num_threads',],
     (chunkdecoder+lz4decoders)(
         "total_length" ,
         "read_blocksize" ,
@@ -283,7 +289,7 @@ FUNCS['omp_bslz4_make_starts_func'] = cfunc(
         "omp_bslz4" ) )
 
 FUNCS['omp_bslz4_with_starts_func'] = cfunc(
-    "int omp_bslz4_blocks", blocklist_args + output_args + shuf_args + ['int num_threads',],
+    "int omp_bslz4_blocks", blocklist_args + output_args + ['int num_threads',],
     (chunkdecoder+lz4decoders)( "total_length" ,"omp_bslz4" ) )
 
 FUNCS['omp_get_threads_func'] = cfunc(

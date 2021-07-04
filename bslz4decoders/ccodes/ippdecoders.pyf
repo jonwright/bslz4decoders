@@ -4,7 +4,7 @@ python module ippdecoders
 interface
         
 
-function onecore_bslz4(compressed,compressed_length,itemsize,output,output_length,tmp,tmp_length)
+function onecore_bslz4(compressed,compressed_length,itemsize,output,output_length)
 intent(c) onecore_bslz4
 intent(c)
 integer(kind=-1) , intent(in) , dimension( compressed_length):: compressed
@@ -12,8 +12,6 @@ integer(kind=8) , intent( hide ), depend( compressed ) :: compressed_length
 integer(kind=4) :: itemsize
 integer(kind=-1) , intent(inout) , dimension( output_length):: output
 integer(kind=8) , intent( hide ), depend( output ) :: output_length
-integer(kind=-1) , intent(inout) , dimension( tmp_length):: tmp
-integer(kind=8) , intent( hide ), depend( tmp ) :: tmp_length
 threadsafe
 integer(kind=4) :: onecore_bslz4
 end function onecore_bslz4

@@ -141,9 +141,9 @@ def decompress_onecore( chunk, config, output = None ):
     """
     if output is None:
         output = np.empty( config.shape, config.dtype )
-    tmp = np.empty( config.blocksize, np.uint8 )
+    # tmp = np.empty( config.blocksize, np.uint8 )
     err = onecore_bslz4( np.asarray(chunk) ,
-                         config.dtype.itemsize, output.view( np.uint8 ), tmp )
+                         config.dtype.itemsize, output.view( np.uint8 ) )
     if err:
         raise Exception("Decoding error")
     # TODO: put the bitshuffle into C !
@@ -155,10 +155,11 @@ def decompress_omp( chunk, config, output = None, num_threads=0):
     """
     if output is None:
         output = np.empty( config.shape, config.dtype )
-    num_threads = omp_get_threads_used( num_threads )
-    tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+    if num_threads == 0:
+        num_threads = omp_get_threads_used( num_threads )
+    # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
     err = omp_bslz4( np.asarray(chunk) , config.dtype.itemsize, output.view( np.uint8 ),
-                     tmp, num_threads )
+                     num_threads )
     if err:
         raise Exception("Decoding error")
     return output.view(config.dtype).reshape( config.shape )
@@ -176,11 +177,12 @@ def decompress_omp_blocks( chunk, config,
         output = np.empty( config.shape, config.dtype )
     if offsets is None:
         offsets = config.get_blocks( achunk )
-    num_threads = omp_get_threads_used( num_threads )
-    tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+    if num_threads == 0:        
+        num_threads = omp_get_threads_used( num_threads )
+    # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
     err = omp_bslz4_blocks( achunk , config.dtype.itemsize,
-                          config.blocksize, offsets, output.view( np.uint8 ),
-                            tmp, num_threads )
+                            config.blocksize, offsets, output.view( np.uint8 ),
+                            num_threads )
     if err:
         raise Exception("Decoding error")
     return output.view(config.dtype).reshape( config.shape )
@@ -192,9 +194,9 @@ if GOTIPP:
         """
         if output is None:
             output = np.empty( config.shape, config.dtype )
-        tmp = np.empty( config.blocksize, np.uint8 )
+        # tmp = np.empty( config.blocksize, np.uint8 )
         err = ipponecore_bslz4( np.asarray(chunk) ,
-                                config.dtype.itemsize, output.view( np.uint8 ), tmp )
+                                config.dtype.itemsize, output.view( np.uint8 ) )
         if err:
             raise Exception("Decoding error")
         # TODO: put the bitshuffle into C !
@@ -203,14 +205,15 @@ if GOTIPP:
 
     def decompress_ippomp( chunk, config, output = None, num_threads=0):
         """  Openmp decoding from our ccodes module
-        todo: cache num_threads and tmp
+        todo: cache num_threads
         """
         if output is None:
             output = np.empty( config.shape, config.dtype )
-        num_threads = omp_get_threads_used( num_threads )
-        tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+        if num_threads == 0:            
+            num_threads = omp_get_threads_used( num_threads )
+        # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
         err = ippomp_bslz4( np.asarray(chunk) , config.dtype.itemsize, output.view( np.uint8 ),
-                            tmp, num_threads )
+                            num_threads )
         if err:
             raise Exception("Decoding error")
         return output.view(config.dtype).reshape( config.shape )
@@ -229,11 +232,12 @@ if GOTIPP:
             output = np.empty( config.shape, config.dtype )
         if offsets is None:
             offsets = config.get_blocks( achunk )
-        num_threads = omp_get_threads_used( num_threads )
-        tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+        if num_threads == 0:
+            num_threads = omp_get_threads_used( num_threads )
+        # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
         err = ippomp_bslz4_blocks( achunk , config.dtype.itemsize,
                                    config.blocksize, offsets, output.view( np.uint8 ),
-                                   tmp, num_threads )
+                                   num_threads )
         if err:
             raise Exception("Decoding error")
         return output.view(config.dtype).reshape( config.shape )
