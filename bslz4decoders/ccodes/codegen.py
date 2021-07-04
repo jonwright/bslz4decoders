@@ -438,11 +438,13 @@ def main( testcompile = False ):
 
     ompfuncs= {name:FUNCS[name] for name in FUNCS if name.startswith("omp")}
     write_pyf("ompdecoders" , "ompdecoders.c", ompfuncs )
+    write_pyf("ippompdecoders" , "ompdecoders.c", ompfuncs )
     write_funcs("ompdecoders.c" , ompfuncs, INCLUDES + LZ4H, MACROS )
     for name in ompfuncs:
         FUNCS.pop( name )
 
     write_pyf("decoders" , "decoders.c", FUNCS )
+    write_pyf("ippdecoders" , "decoders.c", FUNCS )
     write_funcs("decoders.c" , FUNCS, INCLUDES + LZ4H + BSH, MACROS )
 
 

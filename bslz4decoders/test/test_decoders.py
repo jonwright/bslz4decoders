@@ -21,13 +21,14 @@ def runtest_lz4chunkdecoders( decoder, frame = 0, rpt = 10 ):
                 out = np.empty( config.shape, config.dtype )
             decoded = decoder( chunk, config, output = out )
         t2 = timeit.default_timer()
+        GB = RPT*config.output_nbytes/1e9
         if not (decoded == ref).all():
             print("Fail!")
             print(decoded)
             print(ref.ravel())
         else:
-            print(" h5py %.3f ms"%((t1-t0)*1e3), end=' ')
-            print(" here %.3f ms"%((t2-t1)*1e3), end= ' ')
+            print(" h5py %8.3f ms %8.3f GB/s "%((t1-t0)*1e3, GB/(t1-t0)), end= ' ')
+            print(" here %8.3f ms %8.3f GB/s "%((t2-t1)*1e3, GB/(t2-t1)), end= ' ')
         print( " ", h5name, dset )
 
 
@@ -49,26 +50,31 @@ def runtest_lz4blockdecoders( decoder, frame = 0 ):
                 out = np.empty( config.shape, config.dtype )
             decoded = decoder( chunk, config, offsets=blocks, output=out )
         t2 = timeit.default_timer()
+        GB = RPT*config.output_nbytes/1e9
         if not (decoded == ref).all():
             print("Fail!")
             print(decoded)
             print(ref.ravel())
         else:
-            print(" h5py %.3f ms"%((t1-t0)*1e3), end=' ')
-            print(" here %.3f ms"%((t2-t1)*1e3), end= ' ')
+            print(" h5py %8.3f ms %8.3f GB/s "%((t1-t0)*1e3, GB/(t1-t0)), end= ' ')
+            print(" here %8.3f ms %8.3f GB/s "%((t2-t1)*1e3, GB/(t2-t1)), end= ' ')
         print( " ", h5name, dset )
 
 
 def testchunkdecoders():
     for func in ( "decompress_bitshuffle",
                   "decompress_onecore",
-                  "decompress_omp" ):
-        print(func)
+                  "decompress_ipponecore",
+                  "decompress_omp",
+                  "decompress_ippomp" ):
+        print("\n\n",func)
         runtest_lz4chunkdecoders( getattr( decoders, func ) )
+        
+
 
 def testblocked():
-    for func in ( "decompress_omp_blocks", ):
-        print(func)
+    for func in ( "decompress_omp_blocks", "decompress_ippomp_blocks", ):
+        print("\n\n",func)
         runtest_lz4chunkdecoders( getattr( decoders, func ) )
 
 
