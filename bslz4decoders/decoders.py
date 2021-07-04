@@ -6,7 +6,7 @@ import numpy as np
 
 from bslz4decoders.ccodes.h5chunk import h5_dsinfo
 from bslz4decoders.ccodes.decoders import read_starts, onecore_bslz4
-from bslz4decoders.ccodes.ompdecoders import omp_lz4, omp_lz4_blocks
+from bslz4decoders.ccodes.ompdecoders import omp_bslz4, omp_bslz4_blocks, omp_get_threads_used
 
 
 """
@@ -142,21 +142,24 @@ def decompress_onecore( chunk, config, output = None ):
     return output.view(config.dtype).reshape( config.shape )
 
 
-def decompress_omp( chunk, config, output = None ):
+def decompress_omp( chunk, config, output = None, num_threads=0):
     """  Openmp decoding from our ccodes module
     """
     if output is None:
         output = np.empty( config.shape, config.dtype )
-    err = omp_lz4( np.asarray(chunk) , config.dtype.itemsize, output.view( np.uint8 ) )
+    num_threads = omp_get_threads_used( num_threads )
+    tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+    err = omp_bslz4( np.asarray(chunk) , config.dtype.itemsize, output.view( np.uint8 ),
+                     tmp, num_threads )
     if err:
         raise Exception("Decoding error")
-    # TODO: put the bitshuffle into C !
-    return bitshuffle.bitunshuffle( output.view(config.dtype) ).reshape( config.shape )
+    return output.view(config.dtype).reshape( config.shape )
 
 
 def decompress_omp_blocks( chunk, config,
                            offsets=None,
-                           output = None ):
+                           output = None,
+                           num_threads = 0 ):
     """  Openmp decoding from our ccodes module
     (In the long run - we are expecting the offsets to be cached sonewhere)
     """
@@ -165,9 +168,11 @@ def decompress_omp_blocks( chunk, config,
         output = np.empty( config.shape, config.dtype )
     if offsets is None:
         offsets = config.get_blocks( achunk )
-    err = omp_lz4_blocks( achunk , config.dtype.itemsize,
-                          config.blocksize, offsets, output.view( np.uint8 ) )
+    num_threads = omp_get_threads_used( num_threads )
+    tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+    err = omp_bslz4_blocks( achunk , config.dtype.itemsize,
+                          config.blocksize, offsets, output.view( np.uint8 ),
+                            tmp, num_threads )
     if err:
         raise Exception("Decoding error")
-    # TODO: put the bitshuffle into C !
-    return bitshuffle.bitunshuffle( output.view(config.dtype) ).reshape( config.shape )
+    return output.view(config.dtype).reshape( config.shape )

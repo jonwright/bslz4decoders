@@ -4,7 +4,7 @@
    Edit this to change the original :
      codegen.py
    Created on :
-     Fri Jun 11 16:54:12 2021
+     Sun Jul  4 16:17:30 2021
    Code generator written by Jon Wright.
 */
 
@@ -14,10 +14,12 @@
 #include <string.h> /* memcpy */
 
 #ifdef USEIPP
+#warning using ipp
 #include <ippdc.h> /* for intel ... going to need a platform build system */
-#endif
-
+#else
+#warning not using ipp
 #include <lz4.h> /* assumes you have this already */
+#endif
 
 /* see https://justine.lol/endian.html */
 #define READ32BE(p)                                                            \
@@ -38,14 +40,18 @@
   }
 
 #define CHECK_RETURN_VALS 1
-/* Signature for omp_lz4_make_starts_func */
-int omp_lz4(const uint8_t *, size_t, int, uint8_t *, size_t);
-/* Signature for omp_lz4_with_starts_func */
-int omp_lz4_blocks(const uint8_t *, size_t, int, int, uint32_t *, int,
-                   uint8_t *, size_t);
-/* Definition for omp_lz4_make_starts_func */
-int omp_lz4(const uint8_t *compressed, size_t compressed_length, int itemsize,
-            uint8_t *output, size_t output_length) {
+/* Signature for omp_bslz4_make_starts_func */
+int omp_bslz4(const uint8_t *, size_t, int, uint8_t *, size_t, uint8_t *,
+              size_t, int);
+/* Signature for omp_bslz4_with_starts_func */
+int omp_bslz4_blocks(const uint8_t *, size_t, int, size_t, uint32_t *, int,
+                     uint8_t *, size_t, uint8_t *, size_t, int);
+/* Signature for omp_get_threads_func */
+int omp_get_threads_used(int);
+/* Definition for omp_bslz4_make_starts_func */
+int omp_bslz4(const uint8_t *compressed, size_t compressed_length, int itemsize,
+              uint8_t *output, size_t output_length, uint8_t *tmp,
+              size_t tmp_length, int num_threads) {
   /* begin: total_length */
 
   size_t total_output_length;
@@ -89,13 +95,19 @@ int omp_lz4(const uint8_t *compressed, size_t compressed_length, int itemsize,
   }
 
   /* ends: read_starts */
-  /* begin: omp_lz4 */
+  /* begin: omp_bslz4 */
 
+  /* allow user to set the number of threads */
+  if (num_threads == 0)
+    num_threads = omp_get_max_threads();
+  if ((blocksize * num_threads) > tmp_length)
+    return -1;
   int error = 0;
   {
     int i; /* msvc does not let you put this inside the for */
-#pragma omp parallel for shared(error)
+#pragma omp parallel for num_threads(num_threads) shared(error)
     for (i = 0; i < blocks_length - 1; i++) {
+      int t0 = omp_get_thread_num() * blocksize;
 #ifdef USEIPP
       int bsize = blocksize;
       IppStatus ret = ippsDecodeLZ4_8u((Ipp8u *)&compressed[blocks[i] + 4u],
@@ -104,13 +116,20 @@ int omp_lz4(const uint8_t *compressed, size_t compressed_length, int itemsize,
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
         error = 1;
 #else
-      int ret = LZ4_decompress_safe(
-          compressed + blocks[i] + 4u, output + i * blocksize,
-          (int)READ32BE(compressed + blocks[i]), blocksize);
-      if (CHECK_RETURN_VALS && (ret != blocksize))
+      int ret =
+          LZ4_decompress_safe((char *)(compressed + blocks[i] + 4u),
+                              (char *)(output + i * blocksize),
+                              (int)READ32BE(compressed + blocks[i]), blocksize);
+      if (CHECK_RETURN_VALS && (ret != (int)blocksize))
         error = 1;
 #endif
-    }
+      /* bitshuffle here */
+      int64_t bref;
+      bref = bshuf_trans_byte_bitrow_elem(&output[i * blocksize], &tmp[t0],
+                                          blocksize / itemsize, itemsize);
+      bref = bshuf_shuffle_bit_eightelem(&tmp[t0], &output[i * blocksize],
+                                         blocksize / itemsize, itemsize);
+    } /* end parallel loop */
     if (error)
       ERR("Error decoding LZ4");
     /* last block, might not be full blocksize */
@@ -132,38 +151,54 @@ int omp_lz4(const uint8_t *compressed, size_t compressed_length, int itemsize,
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
         ERR("Error LZ4 block");
 #else
-      int ret = LZ4_decompress_safe(compressed + blocks[blocks_length - 1] + 4u,
-                                    output + (blocks_length - 1) * blocksize,
-                                    nbytes, lastblock);
+      int ret = LZ4_decompress_safe(
+          (char *)compressed + blocks[blocks_length - 1] + 4u,
+          (char *)(output + (blocks_length - 1) * blocksize), nbytes,
+          lastblock);
       if (CHECK_RETURN_VALS && (ret != lastblock))
         ERR("Error decoding last LZ4 block");
 #endif
+      /* bitshuffle here */
+      int64_t bref;
+      bref =
+          bshuf_trans_byte_bitrow_elem(&output[(blocks_length - 1) * blocksize],
+                                       &tmp[0], lastblock / itemsize, itemsize);
+      bref = bshuf_shuffle_bit_eightelem(
+          &tmp[0], &output[(blocks_length - 1) * blocksize],
+          lastblock / itemsize, itemsize);
     }
   }
 
-  /* ends: omp_lz4 */
+  /* ends: omp_bslz4 */
   /* begin: create_starts */
   free(blocks);
   /* end: create_starts */
   return 0;
 }
-/* Definition for omp_lz4_with_starts_func */
-int omp_lz4_blocks(const uint8_t *compressed, size_t compressed_length,
-                   int itemsize, int blocksize, uint32_t *blocks,
-                   int blocks_length, uint8_t *output, size_t output_length) {
+/* Definition for omp_bslz4_with_starts_func */
+int omp_bslz4_blocks(const uint8_t *compressed, size_t compressed_length,
+                     int itemsize, size_t blocksize, uint32_t *blocks,
+                     int blocks_length, uint8_t *output, size_t output_length,
+                     uint8_t *tmp, size_t tmp_length, int num_threads) {
   /* begin: total_length */
 
   size_t total_output_length;
   total_output_length = READ64BE(compressed);
 
   /* ends: total_length */
-  /* begin: omp_lz4 */
+  /* begin: omp_bslz4 */
 
+  /* allow user to set the number of threads */
+  if (num_threads == 0)
+    num_threads = omp_get_max_threads();
+  if ((blocksize * num_threads) > tmp_length)
+    return -1;
   int error = 0;
   {
     int i; /* msvc does not let you put this inside the for */
-#pragma omp parallel for shared(error)
+#pragma omp parallel for num_threads(num_threads) shared(error)
     for (i = 0; i < blocks_length - 1; i++) {
+      int t0 = omp_get_thread_num() * blocksize;
 #ifdef USEIPP
       int bsize = blocksize;
       IppStatus ret = ippsDecodeLZ4_8u((Ipp8u *)&compressed[blocks[i] + 4u],
@@ -172,13 +207,20 @@ int omp_lz4_blocks(const uint8_t *compressed, size_t compressed_length,
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
         error = 1;
 #else
-      int ret = LZ4_decompress_safe(
-          compressed + blocks[i] + 4u, output + i * blocksize,
-          (int)READ32BE(compressed + blocks[i]), blocksize);
-      if (CHECK_RETURN_VALS && (ret != blocksize))
+      int ret =
+          LZ4_decompress_safe((char *)(compressed + blocks[i] + 4u),
+                              (char *)(output + i * blocksize),
+                              (int)READ32BE(compressed + blocks[i]), blocksize);
+      if (CHECK_RETURN_VALS && (ret != (int)blocksize))
         error = 1;
 #endif
-    }
+      /* bitshuffle here */
+      int64_t bref;
+      bref = bshuf_trans_byte_bitrow_elem(&output[i * blocksize], &tmp[t0],
+                                          blocksize / itemsize, itemsize);
+      bref = bshuf_shuffle_bit_eightelem(&tmp[t0], &output[i * blocksize],
+                                         blocksize / itemsize, itemsize);
+    } /* end parallel loop */
     if (error)
       ERR("Error decoding LZ4");
     /* last block, might not be full blocksize */
@@ -200,15 +242,33 @@ int omp_lz4_blocks(const uint8_t *compressed, size_t compressed_length,
       if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
         ERR("Error LZ4 block");
 #else
-      int ret = LZ4_decompress_safe(compressed + blocks[blocks_length - 1] + 4u,
-                                    output + (blocks_length - 1) * blocksize,
-                                    nbytes, lastblock);
+      int ret = LZ4_decompress_safe(
+          (char *)compressed + blocks[blocks_length - 1] + 4u,
+          (char *)(output + (blocks_length - 1) * blocksize), nbytes,
+          lastblock);
       if (CHECK_RETURN_VALS && (ret != lastblock))
         ERR("Error decoding last LZ4 block");
 #endif
+      /* bitshuffle here */
+      int64_t bref;
+      bref =
+          bshuf_trans_byte_bitrow_elem(&output[(blocks_length - 1) * blocksize],
+                                       &tmp[0], lastblock / itemsize, itemsize);
+      bref = bshuf_shuffle_bit_eightelem(
+          &tmp[0], &output[(blocks_length - 1) * blocksize],
+          lastblock / itemsize, itemsize);
     }
   }
 
-  /* ends: omp_lz4 */
+  /* ends: omp_bslz4 */
+  return 0;
+}
+/* Definition for omp_get_threads_func */
+int omp_get_threads_used(int num_threads) {
+
+  if (num_threads == 0)
+    num_threads = omp_get_max_threads();
+  return num_threads;
+
   return 0;
 }

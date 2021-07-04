@@ -40,13 +40,14 @@ def runtest_lz4blockdecoders( decoder, frame = 0 ):
             ref = read_chunks.get_frame_h5py( h5name, dset, frame )
         t1 = timeit.default_timer()
         out = None
+        blocks = None
         t1 = timeit.default_timer()
         for _ in range(RPT):
             config, chunk = read_chunks.get_chunk( h5name, dset, frame )
-            blocks = config.get_blocks( chunk )
             if out is None:
+                blocks = config.get_blocks( chunk )
                 out = np.empty( config.shape, config.dtype )
-            decoded = decoder( chunk, config, output=out )
+            decoded = decoder( chunk, config, offsets=blocks, output=out )
         t2 = timeit.default_timer()
         if not (decoded == ref).all():
             print("Fail!")
