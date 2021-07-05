@@ -41,6 +41,11 @@ lopt['msvc'] = []
 # CFLAGS=-march=native -mtune=native
 # LDFLAGS=-march=native -mtune=native
 
+# CFLAGS='-march=native' LDFLAGS='-march=native' \
+#    python setup.py  build_ext --force --inplace \
+#    -IPP=/home/esrf/wright/intel/oneapi/ipp/latest/lib/intel64
+
+
 #  LDSHARED="icc -shared -ipp -ipp-link=static -xHost"                   \
 #   CFLAGS="-DUSEIPP -ipp -ipp-link=static -O3 -std=c99 -fopenmp -xHost" \
 #    CC=icc python setup.py build_ext --inplace --force
@@ -128,14 +133,17 @@ ext_modules = [ Extension( "h5chunk",
 
 ippdc = ( 'libippdc.a', 'libippcore.a' )
 for arg in sys.argv:
-    if arg.startswith('-IPP='):
-        ipproot = arg.split("=")[1]
-        ippdc = [ os.path.join( ipproot, a ) for a in ippdc ]
+    if arg.startswith('-IPP'):
+        if arg.find("=")>=0:
+            ipproot = arg.split("=")[1]
+            ippdc = [ os.path.join( ipproot, a ) for a in ippdc ]
+        else:
+            ippdc = [] # intel compiler probably
         break
 else:
     ippdc = None
 
-        
+
 if ippdc is not None: 
     ipp_modules = [
         Extension( "ippdecoders",
