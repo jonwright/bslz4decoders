@@ -29,7 +29,7 @@ assert os.path.exists( fortranobj )
 
 copt =  {
     'msvc': ['/openmp', '/O2'] ,
-    'unix': ['-fopenmp', '-O2'], #, '-DF2PY_REPORT_ON_ARRAY_COPY=100'] ,
+    'unix': ['-fopenmp', '-O2', '-DF2PY_REPORT_ON_ARRAY_COPY' ] ,
     'mingw32': ['-fopenmp', '-O2'] ,
  }
 
@@ -89,7 +89,7 @@ incdirs, libdirs = compile_paths( places )
 
 print(incdirs)
 print(libdirs)
-input("ok?")
+
 
 
 if platform.system() == 'Windows':
@@ -126,21 +126,29 @@ ext_modules = [ Extension( "h5chunk",
 
 
 
-if "-IPP" in sys.argv:
-    
-    ippa = "/home/esrf/wright/intel/oneapi/ipp/latest/lib/intel64/libippdc.a"
+ippdc = ( 'libippdc.a', 'libippcore.a' )
+for arg in sys.argv:
+    if arg.startswith('-IPP='):
+        ipproot = arg.split("=")[1]
+        ippdc = [ os.path.join( ipproot, a ) for a in ippdc ]
+        break
+else:
+    ippdc = None
+
+        
+if ippdc is not None: 
     ipp_modules = [
         Extension( "ippdecoders",
-                   sources = ["decoders.c", "decodersmodule.c", fortranobj],
+                   sources = ["decoders.c", "ippdecodersmodule.c", fortranobj, bsobj],
                    define_macros = [('USEIPP', '1')],
                    include_dirs  = incdirs,
-                   libraries = [ippa],
+                   extra_objects = ippdc,
                    library_dirs  = libdirs ),
         Extension( "ippompdecoders",
-                   sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
+                   sources = ["ompdecoders.c", "ippompdecodersmodule.c", fortranobj, bsobj],
                    define_macros = [('USEIPP', '1')],
                    include_dirs  = incdirs,
-                   libraries = [ippa],
+                   extra_objects = ippdc,
                    library_dirs  = libdirs )
     ]
     ext_modules += ipp_modules
@@ -151,3 +159,7 @@ setup( name = "ccodes" ,
        ext_modules = ext_modules,
        cmdclass = { 'build_ext' : build_ext_subclass },
 )
+
+if ippdc is None and platform.machine() == 'x86_64':
+    print("Intel IPP was not used")
+    print("Add -IPP=/location/of/intel/oneapi/ipp/latest/lib/intel64 to your setup.py command" )
