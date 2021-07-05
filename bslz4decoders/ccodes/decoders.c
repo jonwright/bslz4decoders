@@ -4,7 +4,7 @@
    Edit this to change the original :
      codegen.py
    Created on :
-     Fri Jun 11 16:54:12 2021
+     Sun Jul  4 17:36:17 2021
    Code generator written by Jon Wright.
 */
 
@@ -14,10 +14,14 @@
 #include <string.h> /* memcpy */
 
 #ifdef USEIPP
+#warning using ipp
 #include <ippdc.h> /* for intel ... going to need a platform build system */
+#else
+#warning not using ipp
+#include <lz4.h> /* assumes you have this already */
 #endif
 
-#include <lz4.h> /* assumes you have this already */
+#include "bitshuffle_core.h"
 
 /* see https://justine.lol/endian.html */
 #define READ32BE(p)                                                            \
@@ -38,15 +42,15 @@
   }
 
 #define CHECK_RETURN_VALS 1
-/* Signature for onecore_lz4_func */
-int onecore_lz4(const uint8_t *, size_t, int, uint8_t *, size_t);
+/* Signature for onecore_bslz4_func */
+int onecore_bslz4(const uint8_t *, size_t, int, uint8_t *, size_t);
 /* Signature for print_offsets_func */
 int print_offsets(const uint8_t *, size_t, int);
 /* Signature for read_starts_func */
-int read_starts(const uint8_t *, size_t, int, int, uint32_t *, int);
-/* Definition for onecore_lz4_func */
-int onecore_lz4(const uint8_t *compressed, size_t compressed_length,
-                int itemsize, uint8_t *output, size_t output_length) {
+int read_starts(const uint8_t *, size_t, int, size_t, uint32_t *, int);
+/* Definition for onecore_bslz4_func */
+int onecore_bslz4(const uint8_t *compressed, size_t compressed_length,
+                  int itemsize, uint8_t *output, size_t output_length) {
   /* begin: total_length */
 
   size_t total_output_length;
@@ -69,9 +73,13 @@ int onecore_lz4(const uint8_t *compressed, size_t compressed_length,
       (int)((total_output_length + (size_t)blocksize - 1) / (size_t)blocksize);
 
   /* ends: blocks_length */
-  /* begin: onecore_lz4 */
+  /* begin: onecore_bslz4 */
 
   int p = 12;
+  if (blocksize > 8192) {
+    return -101;
+  }
+  char tmp[8192];
   for (int i = 0; i < blocks_length - 1; ++i) {
     int nbytes = (int)READ32BE(&compressed[p]);
 #ifdef USEIPP
@@ -81,11 +89,18 @@ int onecore_lz4(const uint8_t *compressed, size_t compressed_length,
     if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
       ERR("Error LZ4 block");
 #else
-    int ret = LZ4_decompress_safe(&compressed[p + 4], &output[i * blocksize],
-                                  nbytes, blocksize);
+    int ret =
+        LZ4_decompress_safe((char *)&compressed[p + 4],
+                            (char *)&output[i * blocksize], nbytes, blocksize);
     if (CHECK_RETURN_VALS && (ret != blocksize))
       ERR("Error LZ4 block");
 #endif
+    /* bitshuffle here */
+    int64_t bref;
+    bref = bshuf_trans_byte_bitrow_elem(&output[i * blocksize], &tmp[0],
+                                        blocksize / itemsize, itemsize);
+    bref = bshuf_shuffle_bit_eightelem(&tmp[0], &output[i * blocksize],
+                                       blocksize / itemsize, itemsize);
     p = p + nbytes + 4;
   }
   /* last block, might not be full blocksize */
@@ -99,22 +114,31 @@ int onecore_lz4(const uint8_t *compressed, size_t compressed_length,
 
     int nbytes = (int)READ32BE(&compressed[p]);
 #ifdef USEIPP
-    int bsize = blocksize;
+    int bsize = lastblock;
     IppStatus ret = ippsDecodeLZ4_8u(
         (Ipp8u *)&compressed[p + 4], nbytes,
         (Ipp8u *)&output[(blocks_length - 1) * blocksize], &bsize);
     if (CHECK_RETURN_VALS && (ret != ippStsNoErr))
       ERR("Error LZ4 block");
 #else
-    int ret = LZ4_decompress_safe(&compressed[p + 4],
-                                  &output[(blocks_length - 1) * blocksize],
-                                  nbytes, lastblock);
+    int ret = LZ4_decompress_safe(
+        (char *)&compressed[p + 4],
+        (char *)&output[(blocks_length - 1) * blocksize], nbytes, lastblock);
     if (CHECK_RETURN_VALS && (ret != lastblock))
       ERR("Error decoding last LZ4 block");
 #endif
+    /* bitshuffle here */
+    int64_t bref;
+    bref =
+        bshuf_trans_byte_bitrow_elem(&output[(blocks_length - 1) * blocksize],
+                                     &tmp[0], lastblock / itemsize, itemsize);
+    bref = bshuf_shuffle_bit_eightelem(&tmp[0],
+                                       &output[(blocks_length - 1) * blocksize],
+                                       lastblock / itemsize, itemsize);
   }
+  return 0;
 
-  /* ends: onecore_lz4 */
+  /* ends: onecore_bslz4 */
   return 0;
 }
 /* Definition for print_offsets_func */
@@ -179,7 +203,7 @@ int print_offsets(const uint8_t *compressed, size_t compressed_length,
 }
 /* Definition for read_starts_func */
 int read_starts(const uint8_t *compressed, size_t compressed_length,
-                int itemsize, int blocksize, uint32_t *blocks,
+                int itemsize, size_t blocksize, uint32_t *blocks,
                 int blocks_length) {
   /* begin: read_starts */
 

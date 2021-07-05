@@ -4,7 +4,7 @@
    Edit this to change the original :
      codegen.py
    Created on :
-     Fri Jun 11 16:54:12 2021
+     Sun Jul  4 17:36:17 2021
    Code generator written by Jon Wright.
 */
 
@@ -12,10 +12,6 @@
 #include <stdio.h>  /* print error message before killing process(!?!?) */
 #include <stdlib.h> /* malloc and friends */
 #include <string.h> /* memcpy */
-
-#ifdef USEIPP
-#include <ippdc.h> /* for intel ... going to need a platform build system */
-#endif
 
 #include <hdf5.h> /* to grab chunks independently of h5py api (py27 issue) */
 
@@ -44,6 +40,8 @@ size_t h5_chunk_size(int64_t, int);
 int h5_close_dset(int64_t);
 /* Signature for h5_close_file */
 int h5_close_file(int64_t);
+/* Signature for h5_dsinfo */
+size_t h5_dsinfo(int64_t, int64_t *, int);
 /* Signature for h5_open_dset */
 size_t h5_open_dset(int64_t, char *);
 /* Signature for h5_open_file */
@@ -82,7 +80,37 @@ int h5_close_file(int64_t hfile) {
 
   return 0;
 }
-/* Definition for h5_open_dset */
+/* Definition for h5_dsinfo */
+size_t h5_dsinfo(int64_t dataset_id, int64_t *dsinfo, int dsinfo_length) {
+
+  hid_t h5t = H5Dget_type(dataset_id);
+  if (h5t < 0)
+    return h5t;
+  dsinfo[0] = H5Tget_size(h5t);
+  dsinfo[1] = H5Tget_class(h5t);
+  if (dsinfo[1] == H5T_INTEGER) {
+    dsinfo[2] = H5Tget_sign(h5t);
+  } else {
+    dsinfo[2] = 0;
+  }
+  H5Tclose(h5t);
+  hid_t h5s = H5Dget_space(dataset_id);
+  if (h5s < 0)
+    return h5s;
+  dsinfo[4] = H5Sget_simple_extent_ndims(h5s);
+  if ((dsinfo[4] + 4) > dsinfo_length) {
+    H5Sclose(h5s);
+    return -1;
+  }
+  int err = H5Sget_simple_extent_dims(h5s, &dsinfo[5], NULL);
+  H5Sclose(h5s);
+  int64_t nb = 1;
+  for (int i = 0; i < dsinfo[4]; i++)
+    nb *= dsinfo[5 + i];
+  dsinfo[3] = nb;
+  return err;
+
+} /* Definition for h5_open_dset */
 size_t h5_open_dset(int64_t h5file, char *dsetname) {
 
   hid_t dataset;

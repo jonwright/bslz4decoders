@@ -1,5 +1,5 @@
 
-python module decoders
+python module ippdecoders
 
 interface
         
@@ -44,4 +44,4 @@ integer(kind=4) :: read_starts
 end function read_starts
 
 end interface
-end module decoders
+end module ippdecoders

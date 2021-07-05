@@ -9,6 +9,7 @@ intent(c) h5_chunk_size
 intent(c)
 integer(kind=8) :: dataset_id
 integer(kind=4) :: frame
+threadsafe
 integer(kind=8) :: h5_chunk_size
 end function h5_chunk_size
 
@@ -18,6 +19,7 @@ function h5_close_dset(dset)
 intent(c) h5_close_dset
 intent(c)
 integer(kind=8) :: dset
+threadsafe
 integer(kind=4) :: h5_close_dset
 end function h5_close_dset
 
@@ -27,8 +29,21 @@ function h5_close_file(hfile)
 intent(c) h5_close_file
 intent(c)
 integer(kind=8) :: hfile
+threadsafe
 integer(kind=4) :: h5_close_file
 end function h5_close_file
+
+
+
+function h5_dsinfo(dataset_id,dsinfo,dsinfo_length)
+intent(c) h5_dsinfo
+intent(c)
+integer(kind=8) :: dataset_id
+integer(kind=8) , intent(inout) , dimension( dsinfo_length):: dsinfo
+integer(kind=4) , intent( hide ), depend( dsinfo ) :: dsinfo_length
+threadsafe
+integer(kind=8) :: h5_dsinfo
+end function h5_dsinfo
 
 
 
@@ -37,6 +52,7 @@ intent(c) h5_open_dset
 intent(c)
 integer(kind=8) :: h5file
 character*(*) :: dsetname
+threadsafe
 integer(kind=8) :: h5_open_dset
 end function h5_open_dset
 
@@ -46,6 +62,7 @@ function h5_open_file(hname)
 intent(c) h5_open_file
 intent(c)
 character*(*) :: hname
+threadsafe
 integer(kind=8) :: h5_open_file
 end function h5_open_file
 
@@ -58,6 +75,7 @@ integer(kind=8) :: dataset_id
 integer(kind=4) :: frame
 integer(kind=-1) , intent(inout) , dimension( chunk_length):: chunk
 integer(kind=8) , intent( hide ), depend( chunk ) :: chunk_length
+threadsafe
 integer(kind=8) :: h5_read_direct
 end function h5_read_direct
 

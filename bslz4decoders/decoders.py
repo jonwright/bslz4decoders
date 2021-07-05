@@ -6,8 +6,16 @@ import numpy as np
 
 from bslz4decoders.ccodes.h5chunk import h5_dsinfo
 from bslz4decoders.ccodes.decoders import read_starts, onecore_bslz4
-from bslz4decoders.ccodes.ompdecoders import omp_lz4, omp_lz4_blocks
+from bslz4decoders.ccodes.ompdecoders import omp_bslz4, omp_bslz4_blocks, omp_get_threads_used
 
+try:
+    from bslz4decoders.ccodes.ippdecoders    import onecore_bslz4 as ipponecore_bslz4 
+    from bslz4decoders.ccodes.ippompdecoders import omp_bslz4            as ippomp_bslz4
+    from bslz4decoders.ccodes.ippompdecoders import omp_bslz4_blocks     as ippomp_bslz4_blocks
+    from bslz4decoders.ccodes.ippompdecoders import omp_get_threads_used as ippomp_get_threads_used
+    GOTIPP = True
+except ImportError:
+    GOTIPP = False
 
 """
 We are aiming to duplicate this interface from bitshuffle :
@@ -133,30 +141,34 @@ def decompress_onecore( chunk, config, output = None ):
     """
     if output is None:
         output = np.empty( config.shape, config.dtype )
-    tmp = np.empty( config.blocksize, np.uint8 )
+    # tmp = np.empty( config.blocksize, np.uint8 )
     err = onecore_bslz4( np.asarray(chunk) ,
-                         config.dtype.itemsize, output.view( np.uint8 ), tmp )
+                         config.dtype.itemsize, output.view( np.uint8 ) )
     if err:
         raise Exception("Decoding error")
     # TODO: put the bitshuffle into C !
     return output.view(config.dtype).reshape( config.shape )
 
 
-def decompress_omp( chunk, config, output = None ):
+def decompress_omp( chunk, config, output = None, num_threads=0):
     """  Openmp decoding from our ccodes module
     """
     if output is None:
         output = np.empty( config.shape, config.dtype )
-    err = omp_lz4( np.asarray(chunk) , config.dtype.itemsize, output.view( np.uint8 ) )
+    if num_threads == 0:
+        num_threads = omp_get_threads_used( num_threads )
+    # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+    err = omp_bslz4( np.asarray(chunk) , config.dtype.itemsize, output.view( np.uint8 ),
+                     num_threads )
     if err:
         raise Exception("Decoding error")
-    # TODO: put the bitshuffle into C !
-    return bitshuffle.bitunshuffle( output.view(config.dtype) ).reshape( config.shape )
+    return output.view(config.dtype).reshape( config.shape )
 
 
 def decompress_omp_blocks( chunk, config,
                            offsets=None,
-                           output = None ):
+                           output = None,
+                           num_threads = 0 ):
     """  Openmp decoding from our ccodes module
     (In the long run - we are expecting the offsets to be cached sonewhere)
     """
@@ -165,9 +177,67 @@ def decompress_omp_blocks( chunk, config,
         output = np.empty( config.shape, config.dtype )
     if offsets is None:
         offsets = config.get_blocks( achunk )
-    err = omp_lz4_blocks( achunk , config.dtype.itemsize,
-                          config.blocksize, offsets, output.view( np.uint8 ) )
+    if num_threads == 0:        
+        num_threads = omp_get_threads_used( num_threads )
+    # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+    err = omp_bslz4_blocks( achunk , config.dtype.itemsize,
+                            config.blocksize, offsets, output.view( np.uint8 ),
+                            num_threads )
     if err:
         raise Exception("Decoding error")
-    # TODO: put the bitshuffle into C !
-    return bitshuffle.bitunshuffle( output.view(config.dtype) ).reshape( config.shape )
+    return output.view(config.dtype).reshape( config.shape )
+
+
+if GOTIPP:
+    def decompress_ipponecore( chunk, config, output = None ):
+        """  One core decoding from our ccodes
+        """
+        if output is None:
+            output = np.empty( config.shape, config.dtype )
+        # tmp = np.empty( config.blocksize, np.uint8 )
+        err = ipponecore_bslz4( np.asarray(chunk) ,
+                                config.dtype.itemsize, output.view( np.uint8 ) )
+        if err:
+            raise Exception("Decoding error")
+        # TODO: put the bitshuffle into C !
+        return output.view(config.dtype).reshape( config.shape )
+
+
+    def decompress_ippomp( chunk, config, output = None, num_threads=0):
+        """  Openmp decoding from our ccodes module
+        todo: cache num_threads
+        """
+        if output is None:
+            output = np.empty( config.shape, config.dtype )
+        if num_threads == 0:            
+            num_threads = omp_get_threads_used( num_threads )
+        # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+        err = ippomp_bslz4( np.asarray(chunk) , config.dtype.itemsize, output.view( np.uint8 ),
+                            num_threads )
+        if err:
+            raise Exception("Decoding error")
+        return output.view(config.dtype).reshape( config.shape )
+
+
+    def decompress_ippomp_blocks( chunk, config,
+                                  offsets=None,
+                                  output = None,
+                                  num_threads = 0 ):
+        """  Openmp decoding from our ccodes module
+        (In the long run - we are expecting the offsets to be cached sonewhere)
+        todo: cache num_threads and tmp
+        """
+        achunk = np.asarray( chunk )
+        if output is None:
+            output = np.empty( config.shape, config.dtype )
+        if offsets is None:
+            offsets = config.get_blocks( achunk )
+        if num_threads == 0:
+            num_threads = omp_get_threads_used( num_threads )
+        # tmp = np.empty( config.blocksize * num_threads, np.uint8 )
+        err = ippomp_bslz4_blocks( achunk , config.dtype.itemsize,
+                                   config.blocksize, offsets, output.view( np.uint8 ),
+                                   num_threads )
+        if err:
+            raise Exception("Decoding error")
+        return output.view(config.dtype).reshape( config.shape )

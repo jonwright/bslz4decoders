@@ -1,5 +1,5 @@
 
-python module ompdecoders
+python module ippompdecoders
 
 interface
         
@@ -46,4 +46,4 @@ integer(kind=4) :: omp_get_threads_used
 end function omp_get_threads_used
 
 end interface
-end module ompdecoders
+end module ippompdecoders

@@ -1,4 +1,4 @@
-/* File: decodersmodule.c
+/* File: ippdecodersmodule.c
  * This file is auto-generated with f2py (version:2).
  * f2py is a Fortran to Python Interface Generator (FPIG), Second Edition,
  * written by Pearu Peterson <pearu@cens.ioc.ee>.
@@ -17,8 +17,8 @@ extern "C" {
 #include <math.h>
 
 /**************** See f2py2e/rules.py: mod_rules['modulebody'] ****************/
-static PyObject *decoders_error;
-static PyObject *decoders_module;
+static PyObject *ippdecoders_error;
+static PyObject *ippdecoders_module;
 
 /*********************** See f2py2e/cfuncs.py: typedefs ***********************/
 typedef unsigned char unsigned_char;
@@ -85,7 +85,7 @@ typedef unsigned long long unsigned_long_long;
     if (!(check)) {\
         char errstring[256];\
         sprintf(errstring, "%s: "show, "("tcheck") failed for "name, var);\
-        PyErr_SetString(decoders_error,errstring);\
+        PyErr_SetString(ippdecoders_error,errstring);\
         /*goto capi_fail;*/\
     } else 
 #ifdef DEBUGCFUNCS
@@ -162,7 +162,7 @@ static int int_from_pyobj(int* v,PyObject *obj,const char *errmess) {
     }
     {
         PyObject* err = PyErr_Occurred();
-        if (err==NULL) err = decoders_error;
+        if (err==NULL) err = ippdecoders_error;
         PyErr_SetString(err,errmess);
     }
     return 0;
@@ -197,7 +197,7 @@ static int long_long_from_pyobj(long_long* v,PyObject *obj,const char *errmess) 
     }
     {
         PyObject* err = PyErr_Occurred();
-        if (err==NULL) err = decoders_error;
+        if (err==NULL) err = ippdecoders_error;
         PyErr_SetString(err,errmess);
     }
     return 0;
@@ -225,7 +225,7 @@ extern int read_starts(unsigned_char*,long_long,int,long_long,unsigned*,int);
 /*********************** See f2py2e/rules.py: buildapi ***********************/
 
 /******************************* onecore_bslz4 *******************************/
-static char doc_f2py_rout_decoders_onecore_bslz4[] = "\
+static char doc_f2py_rout_ippdecoders_onecore_bslz4[] = "\
 onecore_bslz4 = onecore_bslz4(compressed,itemsize,output)\n\nWrapper for ``onecore_bslz4``.\
 \n\nParameters\n----------\n"
 "compressed : input rank-1 array('B') with bounds (compressed_length)\n"
@@ -234,7 +234,7 @@ onecore_bslz4 = onecore_bslz4(compressed,itemsize,output)\n\nWrapper for ``oneco
 "\nReturns\n-------\n"
 "onecore_bslz4 : int";
 /* extern int onecore_bslz4(unsigned_char*,long_long,int,unsigned_char*,long_long); */
-static PyObject *f2py_rout_decoders_onecore_bslz4(const PyObject *capi_self,
+static PyObject *f2py_rout_ippdecoders_onecore_bslz4(const PyObject *capi_self,
                            PyObject *capi_args,
                            PyObject *capi_keywds,
                            int (*f2py_func)(unsigned_char*,long_long,int,unsigned_char*,long_long)) {
@@ -266,7 +266,7 @@ static PyObject *f2py_rout_decoders_onecore_bslz4(const PyObject *capi_self,
 f2py_start_clock();
 #endif
   if (!PyArg_ParseTupleAndKeywords(capi_args,capi_keywds,\
-    "OOO|:decoders.onecore_bslz4",\
+    "OOO|:ippdecoders.onecore_bslz4",\
     capi_kwlist,&compressed_capi,&itemsize_capi,&output_capi))
     return NULL;
 /*frompyobj*/
@@ -277,13 +277,13 @@ f2py_start_clock();
   if (capi_compressed_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 1st argument `compressed' of decoders.onecore_bslz4 to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippdecoders_error,"failed in converting 1st argument `compressed' of ippdecoders.onecore_bslz4 to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     compressed = (unsigned_char *)(PyArray_DATA(capi_compressed_tmp));
 
   /* Processing variable itemsize */
-    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"decoders.onecore_bslz4() 2nd argument (itemsize) can't be converted to int");
+    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"ippdecoders.onecore_bslz4() 2nd argument (itemsize) can't be converted to int");
   if (f2py_success) {
   /* Processing variable output */
   ;
@@ -292,7 +292,7 @@ f2py_start_clock();
   if (capi_output_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 3rd argument `output' of decoders.onecore_bslz4 to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippdecoders_error,"failed in converting 3rd argument `output' of ippdecoders.onecore_bslz4 to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     output = (unsigned_char *)(PyArray_DATA(capi_output_tmp));
@@ -356,7 +356,7 @@ f2py_stop_clock();
 /**************************** end of onecore_bslz4 ****************************/
 
 /******************************* print_offsets *******************************/
-static char doc_f2py_rout_decoders_print_offsets[] = "\
+static char doc_f2py_rout_ippdecoders_print_offsets[] = "\
 print_offsets = print_offsets(compressed,itemsize)\n\nWrapper for ``print_offsets``.\
 \n\nParameters\n----------\n"
 "compressed : input rank-1 array('B') with bounds (compressed_length)\n"
@@ -364,7 +364,7 @@ print_offsets = print_offsets(compressed,itemsize)\n\nWrapper for ``print_offset
 "\nReturns\n-------\n"
 "print_offsets : int";
 /* extern int print_offsets(unsigned_char*,long_long,int); */
-static PyObject *f2py_rout_decoders_print_offsets(const PyObject *capi_self,
+static PyObject *f2py_rout_ippdecoders_print_offsets(const PyObject *capi_self,
                            PyObject *capi_args,
                            PyObject *capi_keywds,
                            int (*f2py_func)(unsigned_char*,long_long,int)) {
@@ -389,7 +389,7 @@ static PyObject *f2py_rout_decoders_print_offsets(const PyObject *capi_self,
 f2py_start_clock();
 #endif
   if (!PyArg_ParseTupleAndKeywords(capi_args,capi_keywds,\
-    "OO|:decoders.print_offsets",\
+    "OO|:ippdecoders.print_offsets",\
     capi_kwlist,&compressed_capi,&itemsize_capi))
     return NULL;
 /*frompyobj*/
@@ -400,13 +400,13 @@ f2py_start_clock();
   if (capi_compressed_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 1st argument `compressed' of decoders.print_offsets to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippdecoders_error,"failed in converting 1st argument `compressed' of ippdecoders.print_offsets to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     compressed = (unsigned_char *)(PyArray_DATA(capi_compressed_tmp));
 
   /* Processing variable itemsize */
-    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"decoders.print_offsets() 2nd argument (itemsize) can't be converted to int");
+    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"ippdecoders.print_offsets() 2nd argument (itemsize) can't be converted to int");
   if (f2py_success) {
   /* Processing variable compressed_length */
   compressed_length = len(compressed);
@@ -458,7 +458,7 @@ f2py_stop_clock();
 /**************************** end of print_offsets ****************************/
 
 /******************************** read_starts ********************************/
-static char doc_f2py_rout_decoders_read_starts[] = "\
+static char doc_f2py_rout_ippdecoders_read_starts[] = "\
 read_starts = read_starts(compressed,itemsize,blocksize,blocks)\n\nWrapper for ``read_starts``.\
 \n\nParameters\n----------\n"
 "compressed : input rank-1 array('B') with bounds (compressed_length)\n"
@@ -468,7 +468,7 @@ read_starts = read_starts(compressed,itemsize,blocksize,blocks)\n\nWrapper for `
 "\nReturns\n-------\n"
 "read_starts : int";
 /* extern int read_starts(unsigned_char*,long_long,int,long_long,unsigned*,int); */
-static PyObject *f2py_rout_decoders_read_starts(const PyObject *capi_self,
+static PyObject *f2py_rout_ippdecoders_read_starts(const PyObject *capi_self,
                            PyObject *capi_args,
                            PyObject *capi_keywds,
                            int (*f2py_func)(unsigned_char*,long_long,int,long_long,unsigned*,int)) {
@@ -502,7 +502,7 @@ static PyObject *f2py_rout_decoders_read_starts(const PyObject *capi_self,
 f2py_start_clock();
 #endif
   if (!PyArg_ParseTupleAndKeywords(capi_args,capi_keywds,\
-    "OOOO|:decoders.read_starts",\
+    "OOOO|:ippdecoders.read_starts",\
     capi_kwlist,&compressed_capi,&itemsize_capi,&blocksize_capi,&blocks_capi))
     return NULL;
 /*frompyobj*/
@@ -513,16 +513,16 @@ f2py_start_clock();
   if (capi_compressed_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 1st argument `compressed' of decoders.read_starts to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippdecoders_error,"failed in converting 1st argument `compressed' of ippdecoders.read_starts to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     compressed = (unsigned_char *)(PyArray_DATA(capi_compressed_tmp));
 
   /* Processing variable itemsize */
-    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"decoders.read_starts() 2nd argument (itemsize) can't be converted to int");
+    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"ippdecoders.read_starts() 2nd argument (itemsize) can't be converted to int");
   if (f2py_success) {
   /* Processing variable blocksize */
-    f2py_success = long_long_from_pyobj(&blocksize,blocksize_capi,"decoders.read_starts() 3rd argument (blocksize) can't be converted to long_long");
+    f2py_success = long_long_from_pyobj(&blocksize,blocksize_capi,"ippdecoders.read_starts() 3rd argument (blocksize) can't be converted to long_long");
   if (f2py_success) {
   /* Processing variable blocks */
   ;
@@ -531,7 +531,7 @@ f2py_start_clock();
   if (capi_blocks_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 4th argument `blocks' of decoders.read_starts to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippdecoders_error,"failed in converting 4th argument `blocks' of ippdecoders.read_starts to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     blocks = (unsigned *)(PyArray_DATA(capi_blocks_tmp));
@@ -609,9 +609,9 @@ f2py_stop_clock();
 /**************************** See f2py2e/rules.py ****************************/
 
 static FortranDataDef f2py_routine_defs[] = {
-  {"onecore_bslz4",-1,{{-1}},0,(char *)onecore_bslz4,(f2py_init_func)f2py_rout_decoders_onecore_bslz4,doc_f2py_rout_decoders_onecore_bslz4},
-  {"print_offsets",-1,{{-1}},0,(char *)print_offsets,(f2py_init_func)f2py_rout_decoders_print_offsets,doc_f2py_rout_decoders_print_offsets},
-  {"read_starts",-1,{{-1}},0,(char *)read_starts,(f2py_init_func)f2py_rout_decoders_read_starts,doc_f2py_rout_decoders_read_starts},
+  {"onecore_bslz4",-1,{{-1}},0,(char *)onecore_bslz4,(f2py_init_func)f2py_rout_ippdecoders_onecore_bslz4,doc_f2py_rout_ippdecoders_onecore_bslz4},
+  {"print_offsets",-1,{{-1}},0,(char *)print_offsets,(f2py_init_func)f2py_rout_ippdecoders_print_offsets,doc_f2py_rout_ippdecoders_print_offsets},
+  {"read_starts",-1,{{-1}},0,(char *)read_starts,(f2py_init_func)f2py_rout_ippdecoders_read_starts,doc_f2py_rout_ippdecoders_read_starts},
 
 /*eof routine_defs*/
   {NULL}
@@ -624,7 +624,7 @@ static PyMethodDef f2py_module_methods[] = {
 
 static struct PyModuleDef moduledef = {
   PyModuleDef_HEAD_INIT,
-  "decoders",
+  "ippdecoders",
   NULL,
   -1,
   f2py_module_methods,
@@ -634,33 +634,33 @@ static struct PyModuleDef moduledef = {
   NULL
 };
 
-PyMODINIT_FUNC PyInit_decoders(void) {
+PyMODINIT_FUNC PyInit_ippdecoders(void) {
   int i;
   PyObject *m,*d, *s, *tmp;
-  m = decoders_module = PyModule_Create(&moduledef);
+  m = ippdecoders_module = PyModule_Create(&moduledef);
   Py_SET_TYPE(&PyFortran_Type, &PyType_Type);
   import_array();
   if (PyErr_Occurred())
-    {PyErr_SetString(PyExc_ImportError, "can't initialize module decoders (failed to import numpy)"); return m;}
+    {PyErr_SetString(PyExc_ImportError, "can't initialize module ippdecoders (failed to import numpy)"); return m;}
   d = PyModule_GetDict(m);
   s = PyString_FromString("$Revision: $");
   PyDict_SetItemString(d, "__version__", s);
   Py_DECREF(s);
   s = PyUnicode_FromString(
-    "This module 'decoders' is auto-generated with f2py (version:2).\nFunctions:\n"
+    "This module 'ippdecoders' is auto-generated with f2py (version:2).\nFunctions:\n"
 "  onecore_bslz4 = onecore_bslz4(compressed,itemsize,output)\n"
 "  print_offsets = print_offsets(compressed,itemsize)\n"
 "  read_starts = read_starts(compressed,itemsize,blocksize,blocks)\n"
 ".");
   PyDict_SetItemString(d, "__doc__", s);
   Py_DECREF(s);
-  decoders_error = PyErr_NewException ("decoders.error", NULL, NULL);
+  ippdecoders_error = PyErr_NewException ("ippdecoders.error", NULL, NULL);
   /*
    * Store the error object inside the dict, so that it could get deallocated.
    * (in practice, this is a module, so it likely will not and cannot.)
    */
-  PyDict_SetItemString(d, "_decoders_error", decoders_error);
-  Py_DECREF(decoders_error);
+  PyDict_SetItemString(d, "_ippdecoders_error", ippdecoders_error);
+  Py_DECREF(ippdecoders_error);
   for(i=0;f2py_routine_defs[i].name!=NULL;i++) {
     tmp = PyFortranObject_NewAsAttr(&f2py_routine_defs[i]);
     PyDict_SetItemString(d, f2py_routine_defs[i].name, tmp);
@@ -677,7 +677,7 @@ PyMODINIT_FUNC PyInit_decoders(void) {
 
 #ifdef F2PY_REPORT_ATEXIT
   if (! PyErr_Occurred())
-    on_exit(f2py_report_on_exit,(void*)"decoders");
+    on_exit(f2py_report_on_exit,(void*)"ippdecoders");
 #endif
   return m;
 }

@@ -1,4 +1,4 @@
-/* File: decodersmodule.c
+/* File: ippompdecodersmodule.c
  * This file is auto-generated with f2py (version:2).
  * f2py is a Fortran to Python Interface Generator (FPIG), Second Edition,
  * written by Pearu Peterson <pearu@cens.ioc.ee>.
@@ -17,8 +17,8 @@ extern "C" {
 #include <math.h>
 
 /**************** See f2py2e/rules.py: mod_rules['modulebody'] ****************/
-static PyObject *decoders_error;
-static PyObject *decoders_module;
+static PyObject *ippompdecoders_error;
+static PyObject *ippompdecoders_module;
 
 /*********************** See f2py2e/cfuncs.py: typedefs ***********************/
 typedef unsigned char unsigned_char;
@@ -85,7 +85,7 @@ typedef unsigned long long unsigned_long_long;
     if (!(check)) {\
         char errstring[256];\
         sprintf(errstring, "%s: "show, "("tcheck") failed for "name, var);\
-        PyErr_SetString(decoders_error,errstring);\
+        PyErr_SetString(ippompdecoders_error,errstring);\
         /*goto capi_fail;*/\
     } else 
 #ifdef DEBUGCFUNCS
@@ -162,7 +162,7 @@ static int int_from_pyobj(int* v,PyObject *obj,const char *errmess) {
     }
     {
         PyObject* err = PyErr_Occurred();
-        if (err==NULL) err = decoders_error;
+        if (err==NULL) err = ippompdecoders_error;
         PyErr_SetString(err,errmess);
     }
     return 0;
@@ -197,7 +197,7 @@ static int long_long_from_pyobj(long_long* v,PyObject *obj,const char *errmess) 
     }
     {
         PyObject* err = PyErr_Occurred();
-        if (err==NULL) err = decoders_error;
+        if (err==NULL) err = ippompdecoders_error;
         PyErr_SetString(err,errmess);
     }
     return 0;
@@ -211,9 +211,9 @@ static int long_long_from_pyobj(long_long* v,PyObject *obj,const char *errmess) 
 
 
 /* See f2py2e/rules.py */
-extern int onecore_bslz4(unsigned_char*,long_long,int,unsigned_char*,long_long);
-extern int print_offsets(unsigned_char*,long_long,int);
-extern int read_starts(unsigned_char*,long_long,int,long_long,unsigned*,int);
+extern int omp_bslz4(unsigned_char*,long_long,int,unsigned_char*,long_long,int);
+extern int omp_bslz4_blocks(unsigned_char*,long_long,int,long_long,unsigned*,int,unsigned_char*,long_long,int);
+extern int omp_get_threads_used(int);
 /*eof externroutines*/
 
 /******************** See f2py2e/capi_rules.py: usercode1 ********************/
@@ -224,25 +224,26 @@ extern int read_starts(unsigned_char*,long_long,int,long_long,unsigned*,int);
 
 /*********************** See f2py2e/rules.py: buildapi ***********************/
 
-/******************************* onecore_bslz4 *******************************/
-static char doc_f2py_rout_decoders_onecore_bslz4[] = "\
-onecore_bslz4 = onecore_bslz4(compressed,itemsize,output)\n\nWrapper for ``onecore_bslz4``.\
+/********************************* omp_bslz4 *********************************/
+static char doc_f2py_rout_ippompdecoders_omp_bslz4[] = "\
+omp_bslz4 = omp_bslz4(compressed,itemsize,output,num_threads)\n\nWrapper for ``omp_bslz4``.\
 \n\nParameters\n----------\n"
 "compressed : input rank-1 array('B') with bounds (compressed_length)\n"
 "itemsize : input int\n"
 "output : in/output rank-1 array('B') with bounds (output_length)\n"
+"num_threads : input int\n"
 "\nReturns\n-------\n"
-"onecore_bslz4 : int";
-/* extern int onecore_bslz4(unsigned_char*,long_long,int,unsigned_char*,long_long); */
-static PyObject *f2py_rout_decoders_onecore_bslz4(const PyObject *capi_self,
+"omp_bslz4 : int";
+/* extern int omp_bslz4(unsigned_char*,long_long,int,unsigned_char*,long_long,int); */
+static PyObject *f2py_rout_ippompdecoders_omp_bslz4(const PyObject *capi_self,
                            PyObject *capi_args,
                            PyObject *capi_keywds,
-                           int (*f2py_func)(unsigned_char*,long_long,int,unsigned_char*,long_long)) {
+                           int (*f2py_func)(unsigned_char*,long_long,int,unsigned_char*,long_long,int)) {
   PyObject * volatile capi_buildvalue = NULL;
   volatile int f2py_success = 1;
 /*decl*/
 
-  int onecore_bslz4_return_value=0;
+  int omp_bslz4_return_value=0;
   unsigned_char *compressed = NULL;
   npy_intp compressed_Dims[1] = {-1};
   const int compressed_Rank = 1;
@@ -259,15 +260,17 @@ static PyObject *f2py_rout_decoders_onecore_bslz4(const PyObject *capi_self,
   int capi_output_intent = 0;
   PyObject *output_capi = Py_None;
   long_long output_length = 0;
-  static char *capi_kwlist[] = {"compressed","itemsize","output",NULL};
+  int num_threads = 0;
+  PyObject *num_threads_capi = Py_None;
+  static char *capi_kwlist[] = {"compressed","itemsize","output","num_threads",NULL};
 
 /*routdebugenter*/
 #ifdef F2PY_REPORT_ATEXIT
 f2py_start_clock();
 #endif
   if (!PyArg_ParseTupleAndKeywords(capi_args,capi_keywds,\
-    "OOO|:decoders.onecore_bslz4",\
-    capi_kwlist,&compressed_capi,&itemsize_capi,&output_capi))
+    "OOOO|:ippompdecoders.omp_bslz4",\
+    capi_kwlist,&compressed_capi,&itemsize_capi,&output_capi,&num_threads_capi))
     return NULL;
 /*frompyobj*/
   /* Processing variable compressed */
@@ -277,13 +280,13 @@ f2py_start_clock();
   if (capi_compressed_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 1st argument `compressed' of decoders.onecore_bslz4 to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippompdecoders_error,"failed in converting 1st argument `compressed' of ippompdecoders.omp_bslz4 to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     compressed = (unsigned_char *)(PyArray_DATA(capi_compressed_tmp));
 
   /* Processing variable itemsize */
-    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"decoders.onecore_bslz4() 2nd argument (itemsize) can't be converted to int");
+    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"ippompdecoders.omp_bslz4() 2nd argument (itemsize) can't be converted to int");
   if (f2py_success) {
   /* Processing variable output */
   ;
@@ -292,24 +295,27 @@ f2py_start_clock();
   if (capi_output_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 3rd argument `output' of decoders.onecore_bslz4 to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippompdecoders_error,"failed in converting 3rd argument `output' of ippompdecoders.omp_bslz4 to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     output = (unsigned_char *)(PyArray_DATA(capi_output_tmp));
 
+  /* Processing variable num_threads */
+    f2py_success = int_from_pyobj(&num_threads,num_threads_capi,"ippompdecoders.omp_bslz4() 4th argument (num_threads) can't be converted to int");
+  if (f2py_success) {
   /* Processing variable compressed_length */
   compressed_length = len(compressed);
-  CHECKSCALAR(len(compressed)>=compressed_length,"len(compressed)>=compressed_length","hidden compressed_length","onecore_bslz4:compressed_length=%ld",compressed_length) {
+  CHECKSCALAR(len(compressed)>=compressed_length,"len(compressed)>=compressed_length","hidden compressed_length","omp_bslz4:compressed_length=%ld",compressed_length) {
   /* Processing variable output_length */
   output_length = len(output);
-  CHECKSCALAR(len(output)>=output_length,"len(output)>=output_length","hidden output_length","onecore_bslz4:output_length=%ld",output_length) {
+  CHECKSCALAR(len(output)>=output_length,"len(output)>=output_length","hidden output_length","omp_bslz4:output_length=%ld",output_length) {
 /*end of frompyobj*/
 #ifdef F2PY_REPORT_ATEXIT
 f2py_start_call_clock();
 #endif
 /*callfortranroutine*/
   Py_BEGIN_ALLOW_THREADS
-  onecore_bslz4_return_value = (*f2py_func)(compressed,compressed_length,itemsize,output,output_length);
+  omp_bslz4_return_value = (*f2py_func)(compressed,compressed_length,itemsize,output,output_length,num_threads);
   Py_END_ALLOW_THREADS
 if (PyErr_Occurred())
   f2py_success = 0;
@@ -321,7 +327,7 @@ f2py_stop_call_clock();
 /*pyobjfrom*/
 /*end of pyobjfrom*/
     CFUNCSMESS("Building return value.\n");
-    capi_buildvalue = Py_BuildValue("i",onecore_bslz4_return_value);
+    capi_buildvalue = Py_BuildValue("i",omp_bslz4_return_value);
 /*closepyobjfrom*/
 /*end of closepyobjfrom*/
     } /*if (f2py_success) after callfortranroutine*/
@@ -330,6 +336,8 @@ f2py_stop_call_clock();
   /* End of cleaning variable output_length */
   } /*CHECKSCALAR(len(compressed)>=compressed_length)*/
   /* End of cleaning variable compressed_length */
+  } /*if (f2py_success) of num_threads*/
+  /* End of cleaning variable num_threads */
   if((PyObject *)capi_output_tmp!=output_capi) {
     Py_XDECREF(capi_output_tmp); }
   }  /*if (capi_output_tmp == NULL) ... else of output*/
@@ -353,130 +361,30 @@ f2py_stop_clock();
 #endif
   return capi_buildvalue;
 }
-/**************************** end of onecore_bslz4 ****************************/
+/****************************** end of omp_bslz4 ******************************/
 
-/******************************* print_offsets *******************************/
-static char doc_f2py_rout_decoders_print_offsets[] = "\
-print_offsets = print_offsets(compressed,itemsize)\n\nWrapper for ``print_offsets``.\
-\n\nParameters\n----------\n"
-"compressed : input rank-1 array('B') with bounds (compressed_length)\n"
-"itemsize : input int\n"
-"\nReturns\n-------\n"
-"print_offsets : int";
-/* extern int print_offsets(unsigned_char*,long_long,int); */
-static PyObject *f2py_rout_decoders_print_offsets(const PyObject *capi_self,
-                           PyObject *capi_args,
-                           PyObject *capi_keywds,
-                           int (*f2py_func)(unsigned_char*,long_long,int)) {
-  PyObject * volatile capi_buildvalue = NULL;
-  volatile int f2py_success = 1;
-/*decl*/
-
-  int print_offsets_return_value=0;
-  unsigned_char *compressed = NULL;
-  npy_intp compressed_Dims[1] = {-1};
-  const int compressed_Rank = 1;
-  PyArrayObject *capi_compressed_tmp = NULL;
-  int capi_compressed_intent = 0;
-  PyObject *compressed_capi = Py_None;
-  long_long compressed_length = 0;
-  int itemsize = 0;
-  PyObject *itemsize_capi = Py_None;
-  static char *capi_kwlist[] = {"compressed","itemsize",NULL};
-
-/*routdebugenter*/
-#ifdef F2PY_REPORT_ATEXIT
-f2py_start_clock();
-#endif
-  if (!PyArg_ParseTupleAndKeywords(capi_args,capi_keywds,\
-    "OO|:decoders.print_offsets",\
-    capi_kwlist,&compressed_capi,&itemsize_capi))
-    return NULL;
-/*frompyobj*/
-  /* Processing variable compressed */
-  ;
-  capi_compressed_intent |= F2PY_INTENT_IN|F2PY_INTENT_C;
-  capi_compressed_tmp = array_from_pyobj(NPY_UBYTE,compressed_Dims,compressed_Rank,capi_compressed_intent,compressed_capi);
-  if (capi_compressed_tmp == NULL) {
-    PyObject *exc, *val, *tb;
-    PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 1st argument `compressed' of decoders.print_offsets to C/Fortran array" );
-    npy_PyErr_ChainExceptionsCause(exc, val, tb);
-  } else {
-    compressed = (unsigned_char *)(PyArray_DATA(capi_compressed_tmp));
-
-  /* Processing variable itemsize */
-    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"decoders.print_offsets() 2nd argument (itemsize) can't be converted to int");
-  if (f2py_success) {
-  /* Processing variable compressed_length */
-  compressed_length = len(compressed);
-  CHECKSCALAR(len(compressed)>=compressed_length,"len(compressed)>=compressed_length","hidden compressed_length","print_offsets:compressed_length=%ld",compressed_length) {
-/*end of frompyobj*/
-#ifdef F2PY_REPORT_ATEXIT
-f2py_start_call_clock();
-#endif
-/*callfortranroutine*/
-  Py_BEGIN_ALLOW_THREADS
-  print_offsets_return_value = (*f2py_func)(compressed,compressed_length,itemsize);
-  Py_END_ALLOW_THREADS
-if (PyErr_Occurred())
-  f2py_success = 0;
-#ifdef F2PY_REPORT_ATEXIT
-f2py_stop_call_clock();
-#endif
-/*end of callfortranroutine*/
-    if (f2py_success) {
-/*pyobjfrom*/
-/*end of pyobjfrom*/
-    CFUNCSMESS("Building return value.\n");
-    capi_buildvalue = Py_BuildValue("i",print_offsets_return_value);
-/*closepyobjfrom*/
-/*end of closepyobjfrom*/
-    } /*if (f2py_success) after callfortranroutine*/
-/*cleanupfrompyobj*/
-  } /*CHECKSCALAR(len(compressed)>=compressed_length)*/
-  /* End of cleaning variable compressed_length */
-  } /*if (f2py_success) of itemsize*/
-  /* End of cleaning variable itemsize */
-  if((PyObject *)capi_compressed_tmp!=compressed_capi) {
-    Py_XDECREF(capi_compressed_tmp); }
-  }  /*if (capi_compressed_tmp == NULL) ... else of compressed*/
-  /* End of cleaning variable compressed */
-/*end of cleanupfrompyobj*/
-  if (capi_buildvalue == NULL) {
-/*routdebugfailure*/
-  } else {
-/*routdebugleave*/
-  }
-  CFUNCSMESS("Freeing memory.\n");
-/*freemem*/
-#ifdef F2PY_REPORT_ATEXIT
-f2py_stop_clock();
-#endif
-  return capi_buildvalue;
-}
-/**************************** end of print_offsets ****************************/
-
-/******************************** read_starts ********************************/
-static char doc_f2py_rout_decoders_read_starts[] = "\
-read_starts = read_starts(compressed,itemsize,blocksize,blocks)\n\nWrapper for ``read_starts``.\
+/****************************** omp_bslz4_blocks ******************************/
+static char doc_f2py_rout_ippompdecoders_omp_bslz4_blocks[] = "\
+omp_bslz4_blocks = omp_bslz4_blocks(compressed,itemsize,blocksize,blocks,output,num_threads)\n\nWrapper for ``omp_bslz4_blocks``.\
 \n\nParameters\n----------\n"
 "compressed : input rank-1 array('B') with bounds (compressed_length)\n"
 "itemsize : input int\n"
 "blocksize : input long\n"
 "blocks : in/output rank-1 array('I') with bounds (blocks_length)\n"
+"output : in/output rank-1 array('B') with bounds (output_length)\n"
+"num_threads : input int\n"
 "\nReturns\n-------\n"
-"read_starts : int";
-/* extern int read_starts(unsigned_char*,long_long,int,long_long,unsigned*,int); */
-static PyObject *f2py_rout_decoders_read_starts(const PyObject *capi_self,
+"omp_bslz4_blocks : int";
+/* extern int omp_bslz4_blocks(unsigned_char*,long_long,int,long_long,unsigned*,int,unsigned_char*,long_long,int); */
+static PyObject *f2py_rout_ippompdecoders_omp_bslz4_blocks(const PyObject *capi_self,
                            PyObject *capi_args,
                            PyObject *capi_keywds,
-                           int (*f2py_func)(unsigned_char*,long_long,int,long_long,unsigned*,int)) {
+                           int (*f2py_func)(unsigned_char*,long_long,int,long_long,unsigned*,int,unsigned_char*,long_long,int)) {
   PyObject * volatile capi_buildvalue = NULL;
   volatile int f2py_success = 1;
 /*decl*/
 
-  int read_starts_return_value=0;
+  int omp_bslz4_blocks_return_value=0;
   unsigned_char *compressed = NULL;
   npy_intp compressed_Dims[1] = {-1};
   const int compressed_Rank = 1;
@@ -495,15 +403,24 @@ static PyObject *f2py_rout_decoders_read_starts(const PyObject *capi_self,
   int capi_blocks_intent = 0;
   PyObject *blocks_capi = Py_None;
   int blocks_length = 0;
-  static char *capi_kwlist[] = {"compressed","itemsize","blocksize","blocks",NULL};
+  unsigned_char *output = NULL;
+  npy_intp output_Dims[1] = {-1};
+  const int output_Rank = 1;
+  PyArrayObject *capi_output_tmp = NULL;
+  int capi_output_intent = 0;
+  PyObject *output_capi = Py_None;
+  long_long output_length = 0;
+  int num_threads = 0;
+  PyObject *num_threads_capi = Py_None;
+  static char *capi_kwlist[] = {"compressed","itemsize","blocksize","blocks","output","num_threads",NULL};
 
 /*routdebugenter*/
 #ifdef F2PY_REPORT_ATEXIT
 f2py_start_clock();
 #endif
   if (!PyArg_ParseTupleAndKeywords(capi_args,capi_keywds,\
-    "OOOO|:decoders.read_starts",\
-    capi_kwlist,&compressed_capi,&itemsize_capi,&blocksize_capi,&blocks_capi))
+    "OOOOOO|:ippompdecoders.omp_bslz4_blocks",\
+    capi_kwlist,&compressed_capi,&itemsize_capi,&blocksize_capi,&blocks_capi,&output_capi,&num_threads_capi))
     return NULL;
 /*frompyobj*/
   /* Processing variable compressed */
@@ -513,16 +430,16 @@ f2py_start_clock();
   if (capi_compressed_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 1st argument `compressed' of decoders.read_starts to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippompdecoders_error,"failed in converting 1st argument `compressed' of ippompdecoders.omp_bslz4_blocks to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     compressed = (unsigned_char *)(PyArray_DATA(capi_compressed_tmp));
 
   /* Processing variable itemsize */
-    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"decoders.read_starts() 2nd argument (itemsize) can't be converted to int");
+    f2py_success = int_from_pyobj(&itemsize,itemsize_capi,"ippompdecoders.omp_bslz4_blocks() 2nd argument (itemsize) can't be converted to int");
   if (f2py_success) {
   /* Processing variable blocksize */
-    f2py_success = long_long_from_pyobj(&blocksize,blocksize_capi,"decoders.read_starts() 3rd argument (blocksize) can't be converted to long_long");
+    f2py_success = long_long_from_pyobj(&blocksize,blocksize_capi,"ippompdecoders.omp_bslz4_blocks() 3rd argument (blocksize) can't be converted to long_long");
   if (f2py_success) {
   /* Processing variable blocks */
   ;
@@ -531,24 +448,42 @@ f2py_start_clock();
   if (capi_blocks_tmp == NULL) {
     PyObject *exc, *val, *tb;
     PyErr_Fetch(&exc, &val, &tb);
-    PyErr_SetString(exc ? exc : decoders_error,"failed in converting 4th argument `blocks' of decoders.read_starts to C/Fortran array" );
+    PyErr_SetString(exc ? exc : ippompdecoders_error,"failed in converting 4th argument `blocks' of ippompdecoders.omp_bslz4_blocks to C/Fortran array" );
     npy_PyErr_ChainExceptionsCause(exc, val, tb);
   } else {
     blocks = (unsigned *)(PyArray_DATA(capi_blocks_tmp));
 
+  /* Processing variable output */
+  ;
+  capi_output_intent |= F2PY_INTENT_INOUT|F2PY_INTENT_C;
+  capi_output_tmp = array_from_pyobj(NPY_UBYTE,output_Dims,output_Rank,capi_output_intent,output_capi);
+  if (capi_output_tmp == NULL) {
+    PyObject *exc, *val, *tb;
+    PyErr_Fetch(&exc, &val, &tb);
+    PyErr_SetString(exc ? exc : ippompdecoders_error,"failed in converting 5th argument `output' of ippompdecoders.omp_bslz4_blocks to C/Fortran array" );
+    npy_PyErr_ChainExceptionsCause(exc, val, tb);
+  } else {
+    output = (unsigned_char *)(PyArray_DATA(capi_output_tmp));
+
+  /* Processing variable num_threads */
+    f2py_success = int_from_pyobj(&num_threads,num_threads_capi,"ippompdecoders.omp_bslz4_blocks() 6th argument (num_threads) can't be converted to int");
+  if (f2py_success) {
   /* Processing variable compressed_length */
   compressed_length = len(compressed);
-  CHECKSCALAR(len(compressed)>=compressed_length,"len(compressed)>=compressed_length","hidden compressed_length","read_starts:compressed_length=%ld",compressed_length) {
+  CHECKSCALAR(len(compressed)>=compressed_length,"len(compressed)>=compressed_length","hidden compressed_length","omp_bslz4_blocks:compressed_length=%ld",compressed_length) {
   /* Processing variable blocks_length */
   blocks_length = len(blocks);
-  CHECKSCALAR(len(blocks)>=blocks_length,"len(blocks)>=blocks_length","hidden blocks_length","read_starts:blocks_length=%d",blocks_length) {
+  CHECKSCALAR(len(blocks)>=blocks_length,"len(blocks)>=blocks_length","hidden blocks_length","omp_bslz4_blocks:blocks_length=%d",blocks_length) {
+  /* Processing variable output_length */
+  output_length = len(output);
+  CHECKSCALAR(len(output)>=output_length,"len(output)>=output_length","hidden output_length","omp_bslz4_blocks:output_length=%ld",output_length) {
 /*end of frompyobj*/
 #ifdef F2PY_REPORT_ATEXIT
 f2py_start_call_clock();
 #endif
 /*callfortranroutine*/
   Py_BEGIN_ALLOW_THREADS
-  read_starts_return_value = (*f2py_func)(compressed,compressed_length,itemsize,blocksize,blocks,blocks_length);
+  omp_bslz4_blocks_return_value = (*f2py_func)(compressed,compressed_length,itemsize,blocksize,blocks,blocks_length,output,output_length,num_threads);
   Py_END_ALLOW_THREADS
 if (PyErr_Occurred())
   f2py_success = 0;
@@ -560,15 +495,23 @@ f2py_stop_call_clock();
 /*pyobjfrom*/
 /*end of pyobjfrom*/
     CFUNCSMESS("Building return value.\n");
-    capi_buildvalue = Py_BuildValue("i",read_starts_return_value);
+    capi_buildvalue = Py_BuildValue("i",omp_bslz4_blocks_return_value);
 /*closepyobjfrom*/
 /*end of closepyobjfrom*/
     } /*if (f2py_success) after callfortranroutine*/
 /*cleanupfrompyobj*/
+  } /*CHECKSCALAR(len(output)>=output_length)*/
+  /* End of cleaning variable output_length */
   } /*CHECKSCALAR(len(blocks)>=blocks_length)*/
   /* End of cleaning variable blocks_length */
   } /*CHECKSCALAR(len(compressed)>=compressed_length)*/
   /* End of cleaning variable compressed_length */
+  } /*if (f2py_success) of num_threads*/
+  /* End of cleaning variable num_threads */
+  if((PyObject *)capi_output_tmp!=output_capi) {
+    Py_XDECREF(capi_output_tmp); }
+  }  /*if (capi_output_tmp == NULL) ... else of output*/
+  /* End of cleaning variable output */
   if((PyObject *)capi_blocks_tmp!=blocks_capi) {
     Py_XDECREF(capi_blocks_tmp); }
   }  /*if (capi_blocks_tmp == NULL) ... else of blocks*/
@@ -594,7 +537,80 @@ f2py_stop_clock();
 #endif
   return capi_buildvalue;
 }
-/***************************** end of read_starts *****************************/
+/************************** end of omp_bslz4_blocks **************************/
+
+/**************************** omp_get_threads_used ****************************/
+static char doc_f2py_rout_ippompdecoders_omp_get_threads_used[] = "\
+omp_get_threads_used = omp_get_threads_used(num_threads)\n\nWrapper for ``omp_get_threads_used``.\
+\n\nParameters\n----------\n"
+"num_threads : input int\n"
+"\nReturns\n-------\n"
+"omp_get_threads_used : int";
+/* extern int omp_get_threads_used(int); */
+static PyObject *f2py_rout_ippompdecoders_omp_get_threads_used(const PyObject *capi_self,
+                           PyObject *capi_args,
+                           PyObject *capi_keywds,
+                           int (*f2py_func)(int)) {
+  PyObject * volatile capi_buildvalue = NULL;
+  volatile int f2py_success = 1;
+/*decl*/
+
+  int omp_get_threads_used_return_value=0;
+  int num_threads = 0;
+  PyObject *num_threads_capi = Py_None;
+  static char *capi_kwlist[] = {"num_threads",NULL};
+
+/*routdebugenter*/
+#ifdef F2PY_REPORT_ATEXIT
+f2py_start_clock();
+#endif
+  if (!PyArg_ParseTupleAndKeywords(capi_args,capi_keywds,\
+    "O|:ippompdecoders.omp_get_threads_used",\
+    capi_kwlist,&num_threads_capi))
+    return NULL;
+/*frompyobj*/
+  /* Processing variable num_threads */
+    f2py_success = int_from_pyobj(&num_threads,num_threads_capi,"ippompdecoders.omp_get_threads_used() 1st argument (num_threads) can't be converted to int");
+  if (f2py_success) {
+/*end of frompyobj*/
+#ifdef F2PY_REPORT_ATEXIT
+f2py_start_call_clock();
+#endif
+/*callfortranroutine*/
+  Py_BEGIN_ALLOW_THREADS
+  omp_get_threads_used_return_value = (*f2py_func)(num_threads);
+  Py_END_ALLOW_THREADS
+if (PyErr_Occurred())
+  f2py_success = 0;
+#ifdef F2PY_REPORT_ATEXIT
+f2py_stop_call_clock();
+#endif
+/*end of callfortranroutine*/
+    if (f2py_success) {
+/*pyobjfrom*/
+/*end of pyobjfrom*/
+    CFUNCSMESS("Building return value.\n");
+    capi_buildvalue = Py_BuildValue("i",omp_get_threads_used_return_value);
+/*closepyobjfrom*/
+/*end of closepyobjfrom*/
+    } /*if (f2py_success) after callfortranroutine*/
+/*cleanupfrompyobj*/
+  } /*if (f2py_success) of num_threads*/
+  /* End of cleaning variable num_threads */
+/*end of cleanupfrompyobj*/
+  if (capi_buildvalue == NULL) {
+/*routdebugfailure*/
+  } else {
+/*routdebugleave*/
+  }
+  CFUNCSMESS("Freeing memory.\n");
+/*freemem*/
+#ifdef F2PY_REPORT_ATEXIT
+f2py_stop_clock();
+#endif
+  return capi_buildvalue;
+}
+/************************ end of omp_get_threads_used ************************/
 /*eof body*/
 
 /******************* See f2py2e/f90mod_rules.py: buildhooks *******************/
@@ -609,9 +625,9 @@ f2py_stop_clock();
 /**************************** See f2py2e/rules.py ****************************/
 
 static FortranDataDef f2py_routine_defs[] = {
-  {"onecore_bslz4",-1,{{-1}},0,(char *)onecore_bslz4,(f2py_init_func)f2py_rout_decoders_onecore_bslz4,doc_f2py_rout_decoders_onecore_bslz4},
-  {"print_offsets",-1,{{-1}},0,(char *)print_offsets,(f2py_init_func)f2py_rout_decoders_print_offsets,doc_f2py_rout_decoders_print_offsets},
-  {"read_starts",-1,{{-1}},0,(char *)read_starts,(f2py_init_func)f2py_rout_decoders_read_starts,doc_f2py_rout_decoders_read_starts},
+  {"omp_bslz4",-1,{{-1}},0,(char *)omp_bslz4,(f2py_init_func)f2py_rout_ippompdecoders_omp_bslz4,doc_f2py_rout_ippompdecoders_omp_bslz4},
+  {"omp_bslz4_blocks",-1,{{-1}},0,(char *)omp_bslz4_blocks,(f2py_init_func)f2py_rout_ippompdecoders_omp_bslz4_blocks,doc_f2py_rout_ippompdecoders_omp_bslz4_blocks},
+  {"omp_get_threads_used",-1,{{-1}},0,(char *)omp_get_threads_used,(f2py_init_func)f2py_rout_ippompdecoders_omp_get_threads_used,doc_f2py_rout_ippompdecoders_omp_get_threads_used},
 
 /*eof routine_defs*/
   {NULL}
@@ -624,7 +640,7 @@ static PyMethodDef f2py_module_methods[] = {
 
 static struct PyModuleDef moduledef = {
   PyModuleDef_HEAD_INIT,
-  "decoders",
+  "ippompdecoders",
   NULL,
   -1,
   f2py_module_methods,
@@ -634,33 +650,33 @@ static struct PyModuleDef moduledef = {
   NULL
 };
 
-PyMODINIT_FUNC PyInit_decoders(void) {
+PyMODINIT_FUNC PyInit_ippompdecoders(void) {
   int i;
   PyObject *m,*d, *s, *tmp;
-  m = decoders_module = PyModule_Create(&moduledef);
+  m = ippompdecoders_module = PyModule_Create(&moduledef);
   Py_SET_TYPE(&PyFortran_Type, &PyType_Type);
   import_array();
   if (PyErr_Occurred())
-    {PyErr_SetString(PyExc_ImportError, "can't initialize module decoders (failed to import numpy)"); return m;}
+    {PyErr_SetString(PyExc_ImportError, "can't initialize module ippompdecoders (failed to import numpy)"); return m;}
   d = PyModule_GetDict(m);
   s = PyString_FromString("$Revision: $");
   PyDict_SetItemString(d, "__version__", s);
   Py_DECREF(s);
   s = PyUnicode_FromString(
-    "This module 'decoders' is auto-generated with f2py (version:2).\nFunctions:\n"
-"  onecore_bslz4 = onecore_bslz4(compressed,itemsize,output)\n"
-"  print_offsets = print_offsets(compressed,itemsize)\n"
-"  read_starts = read_starts(compressed,itemsize,blocksize,blocks)\n"
+    "This module 'ippompdecoders' is auto-generated with f2py (version:2).\nFunctions:\n"
+"  omp_bslz4 = omp_bslz4(compressed,itemsize,output,num_threads)\n"
+"  omp_bslz4_blocks = omp_bslz4_blocks(compressed,itemsize,blocksize,blocks,output,num_threads)\n"
+"  omp_get_threads_used = omp_get_threads_used(num_threads)\n"
 ".");
   PyDict_SetItemString(d, "__doc__", s);
   Py_DECREF(s);
-  decoders_error = PyErr_NewException ("decoders.error", NULL, NULL);
+  ippompdecoders_error = PyErr_NewException ("ippompdecoders.error", NULL, NULL);
   /*
    * Store the error object inside the dict, so that it could get deallocated.
    * (in practice, this is a module, so it likely will not and cannot.)
    */
-  PyDict_SetItemString(d, "_decoders_error", decoders_error);
-  Py_DECREF(decoders_error);
+  PyDict_SetItemString(d, "_ippompdecoders_error", ippompdecoders_error);
+  Py_DECREF(ippompdecoders_error);
   for(i=0;f2py_routine_defs[i].name!=NULL;i++) {
     tmp = PyFortranObject_NewAsAttr(&f2py_routine_defs[i]);
     PyDict_SetItemString(d, f2py_routine_defs[i].name, tmp);
@@ -677,7 +693,7 @@ PyMODINIT_FUNC PyInit_decoders(void) {
 
 #ifdef F2PY_REPORT_ATEXIT
   if (! PyErr_Occurred())
-    on_exit(f2py_report_on_exit,(void*)"decoders");
+    on_exit(f2py_report_on_exit,(void*)"ippompdecoders");
 #endif
   return m;
 }
