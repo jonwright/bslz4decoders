@@ -67,26 +67,29 @@ class build_ext_subclass( build_ext.build_ext ):
         build_ext.build_ext.build_extensions(self)
 
 
-def compile_paths( place ):
+def compile_paths( places ):
     incdirs = [ numpy.get_include(), fortraninc, bsinc ]
     libdirs = [ ]
-    cp = place
-    for root in [os.path.join( cp, "Library" ), cp ]:
-        i = os.path.join( root, "include" )
-        l = os.path.join( root, "lib")
-        if os.path.exists( i ) and os.path.exists( l ):
-            incdirs.append( i )
-            libdirs.append( l )
+    for place in places:
+        for root in [os.path.join( place, "Library" ), place ]:
+            i = os.path.join( root, "include" )
+            l = os.path.join( root, "lib")
+            if os.path.exists( i ) and os.path.exists( l ):
+                incdirs.append( i )
+                libdirs.append( l )
     return incdirs, libdirs
 
-if "CONDA_PREFIX" in os.environ:
-    incdirs, libdirs = compile_paths( os.environ["CONDA_PREFIX"] )
-elif os.path.exists( "/nobackup/scratch/HDF5/HDF5-1.10.5" ): # scisoft15
-	incdirs, libdirs = compile_paths( "/nobackup/scratch/HDF5/HDF5-1.10.5" )
-	print("LD_LIBRARY_PATH=/nobackup/scratch/HDF5/HDF5-1.10.5/lib")
-	input("ok?")
 
+places = [ os.environ[var] for var in ("IPPROOT", "CONDA_PREFIX") if var in os.environ ]
 
+if os.path.exists( "/nobackup/scratch/HDF5/HDF5-1.10.5" ): # scisoft15
+    places.append( "/nobackup/scratch/HDF5/HDF5-1.10.5" )
+
+incdirs, libdirs = compile_paths( places )
+
+print(incdirs)
+print(libdirs)
+input("ok?")
 
 
 if platform.system() == 'Windows':
@@ -114,25 +117,27 @@ ext_modules = [ Extension( "h5chunk",
 
 
 
-ipp_modules = [
-    Extension( "ippdecoders",
-               sources = ["decoders.c", "decodersmodule.c", fortranobj],
-               define_macros = [('USEIPP', '1')],
-               include_dirs  = incdirs,
-               libraries = ['ippdc'],
-               library_dirs  = libdirs ),
-    Extension( "ippompdecoders",
-               sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
-               define_macros = [('USEIPP', '1')],
-               include_dirs  = incdirs,
-               libraries = ['ippdc'],
-               library_dirs  = libdirs )
-    ]
-
-
 if "-IPP" in sys.argv:
+    
+    ippa = "/home/esrf/wright/intel/oneapi/ipp/latest/lib/intel64/libippdc.a"
+    ipp_modules = [
+        Extension( "ippdecoders",
+                   sources = ["decoders.c", "decodersmodule.c", fortranobj],
+                   define_macros = [('USEIPP', '1')],
+                   include_dirs  = incdirs,
+                   libraries = [ippa],
+                   library_dirs  = libdirs ),
+        Extension( "ippompdecoders",
+                   sources = ["ompdecoders.c", "ompdecodersmodule.c", fortranobj],
+                   define_macros = [('USEIPP', '1')],
+                   include_dirs  = incdirs,
+                   libraries = [ippa],
+                   library_dirs  = libdirs )
+    ]
     ext_modules += ipp_modules
 
+
+    
 setup( name = "ccodes" ,
        ext_modules = ext_modules,
        cmdclass = { 'build_ext' : build_ext_subclass },
