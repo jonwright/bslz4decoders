@@ -113,7 +113,7 @@ def iter_h5chunks( h5name, dsetname, firstframe=0, lastframe=None, stepframe=1,
             # nbytes = h5chunk.h5_chunk_size(dsid, frame)
             nbytesread = h5chunk.h5_read_direct( dsid, frame, chunk )
             assert nbytesread > 0, "h5chunk.h5_read direct error "+ str(err)
-            yield config, chunk[nbytesread:] # todo - does this copy on a gpu?
+            yield config, chunk[:nbytesread] # todo - does this copy on a gpu?
     except:
         raise #Exception("Error reading %s %s %d"%(h5name, dsetname, frame))
     finally:
