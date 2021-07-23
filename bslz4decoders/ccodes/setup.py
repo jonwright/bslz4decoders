@@ -17,7 +17,6 @@ from distutils.command import build_ext
 import numpy, numpy.f2py
 
 
-
 f2pypath = os.path.split( numpy.f2py.__file__)[0]
 fortraninc = os.path.join( f2pypath, 'src' )
 fortranobj = os.path.join( fortraninc, 'fortranobject.c' )
@@ -71,10 +70,28 @@ class build_ext_subclass( build_ext.build_ext ):
                     e.extra_link_args)
         build_ext.build_ext.build_extensions(self)
 
+def h5config():
+    h5cc = os.popen("which h5cc").read().strip()
+    print("got h5cc = ",h5cc)
+    if os.path.exists(h5cc):
+        with open(h5cc,'r') as f:
+            cfg = { 'prefix': '', 'libdir':'', 'libdevdir': '', 'includedir': ''}
+            for line in f.readlines():
+                for key in cfg:
+                    if line.startswith( key ):
+                        value = line.split( "=" )[1].replace('"', '').strip().replace("${prefix}", cfg['prefix'] )
+                        cfg[key] = value
+        return cfg
+    else:
+        print("Cannot open h5cc")
+        return None
 
 def compile_paths( places ):
-    incdirs = [ numpy.get_include(), fortraninc, bsinc ]
-    libdirs = [ ]
+    h5cfg = h5config()
+    if h5cfg is not None:
+        incdirs = [ h5cfg[ 'includedir' ] , ]
+        libdirs = [ h5cfg[ 'libdevdir'  ] , ]
+    incdirs += [ numpy.get_include(), fortraninc, bsinc ]
     for place in places:
         for root in [os.path.join( place, "Library" ), place ]:
             i = os.path.join( root, "include" )
