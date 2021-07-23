@@ -3,6 +3,7 @@
 
 from bslz4decoders.test.testcases import testcases as TESTCASES
 from bslz4decoders.ccodes import h5chunk
+from bslz4decoders.read_chunks import iter_h5chunks
 import timeit
 import h5py, numpy as np
 
@@ -38,6 +39,14 @@ def h5chunk_chunk( h5name, dsetname, frame):
     return chunk
 
 
+def test_iterh5chunk():
+    for h5name, dset in TESTCASES:
+        for i, (cfg, chunk) in enumerate( iter_h5chunks( h5name, dset )):
+            ref = ref_chunk( h5name, dset, i )
+            assert (np.frombuffer( ref, np.uint8 ) == chunk).all()
+        print(h5name, dset, i)
+    print("iter_h5chunks was OK?")
+
 def test_h5chunk():
     for h5name, dset in TESTCASES:
         for i in range(2):
@@ -60,4 +69,5 @@ def bench_h5chunk():
 
 if __name__=="__main__":
     test_h5chunk() # warm up first
+    test_iterh5chunk()
     bench_h5chunk()
