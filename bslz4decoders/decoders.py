@@ -99,17 +99,19 @@ class BSLZ4ChunkConfig:
 
     
 class BSLZ4ChunkConfigDirect( BSLZ4ChunkConfig ):
-    def __init__(self, dsid):
+    def __init__(self, dsid, blocksize=8192):
+        self.blocksize = blocksize
         dsinfo = np.zeros( 16, np.int64 )
         err = h5_dsinfo( dsid, dsinfo )
-        self.bpp, classtype, signed, self.output_nbytes, ndims = dsinfo[:5]
+        self.bpp, classtype, signed, output_nbytes, ndims = dsinfo[:5]
         assert ndims == 3
         shape = dsinfo[5:5+ndims]
         self.shape = shape[1], shape[2]
+        self.output_nbytes = self.bpp * shape[1] * shape[2] # per frame
         self.nframes = shape[0]
         #            H5T_INTEGER          = 0,   /*integer types                              */
         #            H5T_FLOAT            = 1,   /*floating-point types                       */
-        if classtype == 0:
+        if classtype == 0: # FIXME : kevlar ...
             self.dtype = np.dtype( 'iu'[signed] + str( self.bpp ) )
         elif classtype == 1:
             self.dtype = np.dtype( 'f' + str( self.bpp ) )
