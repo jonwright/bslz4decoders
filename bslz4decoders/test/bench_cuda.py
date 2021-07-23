@@ -53,9 +53,9 @@ def process_thread( qin ):
         if args is None:
             break
         config, chunk = args
-        blocksize, blocks = config.get_blocks( chunk ) # parse data on cpu ...
+        blocks = config.get_blocks( chunk ) # parse data on cpu ...
         if dc is None:
-            dc = BSLZ4CUDA( config.output_nbytes, config.dtype.itemsize, blocksize )
+            dc = BSLZ4CUDA( config.output_nbytes, config.dtype.itemsize, config.blocksize )
             out_gpu = gpuarray.empty( config.shape, dtype = config.dtype )
             msk_gpu = gpuarray.empty( config.shape, dtype = np.uint32 )
         # decompress
