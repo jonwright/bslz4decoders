@@ -111,8 +111,15 @@ class BSLZ4ChunkConfigDirect( BSLZ4ChunkConfig ):
         self.nframes = shape[0]
         #            H5T_INTEGER          = 0,   /*integer types                              */
         #            H5T_FLOAT            = 1,   /*floating-point types                       */
-        if classtype == 0: # FIXME : kevlar ...
-            self.dtype = np.dtype( 'iu'[signed] + str( self.bpp ) )
+        #  H5T_SGN_ERROR        = -1,  /*error                                      */
+        #  H5T_SGN_NONE         = 0,   /*this is an unsigned type                   */
+        #  H5T_SGN_2            = 1,   /*two's complement                           */
+        #  H5T_NSGN             = 2  
+        if classtype == 0: 
+            if signed < 0:
+                raise Exception("H5T_SGN_ERROR")
+            # taking NSGN as not signed, but did not find out what it really means yet
+            self.dtype = np.dtype( 'uiu'[signed] + str( self.bpp ) ) 
         elif classtype == 1:
             self.dtype = np.dtype( 'f' + str( self.bpp ) )
         
