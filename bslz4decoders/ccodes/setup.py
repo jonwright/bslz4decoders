@@ -40,9 +40,11 @@ lopt['msvc'] = []
 # CFLAGS=-march=native -mtune=native
 # LDFLAGS=-march=native -mtune=native
 
-# CFLAGS='-march=native' LDFLAGS='-march=native' \
-#    python setup.py  build_ext --force --inplace \
-#    -IPP=/home/esrf/wright/intel/oneapi/ipp/latest/lib/intel64
+# CFLAGS="-march=native -mtune=native -O2 -g0" \
+#   LDFLAGS="-march=native -mtune=native -O2 -g0" \
+#     IPPROOT=/home/esrf/wright/intel/oneapi/ipp/latest \
+#       python setup.py build_ext --inplace --force \
+#  -IPP=/home/esrf/wright/intel/oneapi/ipp/latest/lib/intel64
 
 
 #  LDSHARED="icc -shared -ipp -ipp-link=static -xHost"                   \

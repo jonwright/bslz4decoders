@@ -26,6 +26,7 @@ def runtest_lz4chunkdecoders( decoder, frame = 0, rpt = 10 ):
             print("Fail!")
             print(decoded)
             print(ref.ravel())
+            sys.exit()
         else:
             print(" h5py %8.3f ms %8.3f GB/s "%((t1-t0)*1e3, GB/(t1-t0)), end= ' ')
             print(" here %8.3f ms %8.3f GB/s "%((t2-t1)*1e3, GB/(t2-t1)), end= ' ')
@@ -55,6 +56,7 @@ def runtest_lz4blockdecoders( decoder, frame = 0 ):
             print("Fail!")
             print(decoded)
             print(ref.ravel())
+            sys.exit()
         else:
             print(" h5py %8.3f ms %8.3f GB/s "%((t1-t0)*1e3, GB/(t1-t0)), end= ' ')
             print(" here %8.3f ms %8.3f GB/s "%((t2-t1)*1e3, GB/(t2-t1)), end= ' ')
@@ -86,5 +88,7 @@ if __name__=="__main__":
     if len(sys.argv) > 3:
         RPT = int(sys.argv[3])
 
+
     testchunkdecoders()
     testblocked()
+

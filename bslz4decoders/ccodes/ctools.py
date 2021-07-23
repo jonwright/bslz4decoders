@@ -5,7 +5,7 @@ A bunch of things to copy paste together fragments of C-code
 This is like a literate style but without the readability.
 """
 
-import os, numpy.f2py
+import os, numpy.f2py, tempfile
 
 
 class compiler:
