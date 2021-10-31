@@ -70,15 +70,20 @@ def testchunkdecoders():
                   "decompress_omp",
                   "decompress_ippomp" ):
         print("\n\n",func)
-        runtest_lz4chunkdecoders( getattr( decoders, func ) )
+        try:
+            runtest_lz4chunkdecoders( getattr( decoders, func ) )
+        except AttributeError:
+            print('Missing', func)
         
 
 
 def testblocked():
     for func in ( "decompress_omp_blocks", "decompress_ippomp_blocks", ):
         print("\n\n",func)
-        runtest_lz4chunkdecoders( getattr( decoders, func ) )
-
+        try:
+            runtest_lz4chunkdecoders( getattr( decoders, func ) )
+        except AttributeError:
+            print('Missing', func)
 
 if __name__=="__main__":
 
