@@ -21,13 +21,16 @@ def check_and_show( a1, a2 ):
         a[1][0].imshow(a2, interpolation='nearest')
         a[1][1].imshow(a1-a2, interpolation='nearest')
         pl.show()
+    else:
+        print('array matches')
 
 
 def testcuda(testcases):
-
-    gpu_sums = { 1 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned char *in" ),
-            2 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned short *in" ),
-            4 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned int *in" ),
+    gpu_sums = { 
+        np.dtype('uint8')  : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned char *in" ),
+        np.dtype('uint16') : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned short *in" ),
+        np.dtype('uint32') : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned int *in" ),
+        np.dtype('int32') : ReductionKernel( np.int64 , "0", "a+b", arguments="const int *in" ),
     }
     out_gpu = None
     frm = 0
@@ -61,7 +64,7 @@ def testcuda(testcases):
             t.append( default_timer()*1e3 )
             check_and_show( ref, data )
             assert(sref == sdata),  " ".join((repr(sref),repr(sdata)))
-            assert(sref == sgpu),  " ".join((repr(sref),repr(sdata)))
+            assert(sref == sgpu),  " ".join((repr(sref),repr(sgpu)))
         dt = [t[i]-t[i-1] for i in range(1,len(t))]
         print(("%.3f ms, "*len(dt))%tuple(dt), hname, dset )
         # print(sref, sdata, type(sref), type(sdata))

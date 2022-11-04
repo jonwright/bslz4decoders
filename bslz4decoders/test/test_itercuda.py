@@ -24,15 +24,29 @@ def check_and_show( a1, a2 ):
 
 
 def testcuda(hname, dset):
-    gpu_sums = { 1 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned char *in" ),
-            2 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned short *in" ),
-            4 : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned int *in" ),
+    gpu_sums = { 
+        np.dtype('uint8')  : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned char *in" ),
+        np.dtype('uint16') : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned short *in" ),
+        np.dtype('uint32') : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned int *in" ),
+        np.dtype('int32') : ReductionKernel( np.int64 , "0", "a+b", arguments="const int *in" ),
     }
     out_gpu = None
     dc = None
-    print("Getchunk Init GPUdc GPUsum DtoH Hsum H5pyRead Hsum")
-    for frm, (config,chunk ) in enumerate( iter_chunks( hname, dset ) ):
+    t0 = default_timer()*1e3
+    print("Read  Decode Init GPUdc GPUsum ", end="")
+    if __debug__: 
+        print("DtoH Hsum H5pyRead Hsum")
+    else:
+        print()
+    iterator = iter_chunks( hname, dset )
+    frm = 0
+    while 1:
         t = [ default_timer()*1e3, ]
+        try:
+            config,chunk = next( iterator )
+        except:
+            break
+        t.append( default_timer()*1e3)
         blocks = config.get_blocks( chunk )
         nbytes = config.output_nbytes
         t.append( default_timer()*1e3)
@@ -46,7 +60,7 @@ def testcuda(hname, dset):
         t.append( default_timer()*1e3 )
         _ = dc( chunk, blocks, out_gpu )
         t.append( default_timer()*1e3 )
-        sgpu = gpu_sums[ config.dtype.itemsize ]( out_gpu ).get()
+        sgpu = gpu_sums[ config.dtype ]( out_gpu ).get()
         t.append( default_timer()*1e3 )
         if __debug__:
             data = out_gpu.get()
@@ -59,9 +73,12 @@ def testcuda(hname, dset):
             check_and_show( ref, data )
             assert(sref == sdata),  " ".join((repr(sref),repr(sdata)))
             assert(sref == sgpu),  " ".join((repr(sref),repr(sdata)))
-            dt = [t[i]-t[i-1] for i in range(1,len(t))]
-            print(("%.3f ms, "*len(dt))%tuple(dt), hname, dset )
-            # print(sref, sdata, type(sref), type(sdata))
+        dt = [t[i]-t[i-1] for i in range(1,len(t))]
+        print(("%.3f ms, "*len(dt))%tuple(dt), hname, dset )
+        frm += 1
+        if frm == 1:
+            t1 = default_timer()*1e3
+    print("Total time after startup",t[-1]-t0,"ms", t[-1]-t1,'ms after init')
 
 if __name__=="__main__":
     import sys
