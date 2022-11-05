@@ -22,7 +22,8 @@ def check_and_show( a1, a2 ):
         a[1][1].imshow(a1-a2, interpolation='nearest')
         pl.show()
     else:
-        print('array matches')
+        pass
+
 
 
 def testcuda(testcases):
@@ -52,7 +53,7 @@ def testcuda(testcases):
         t.append( default_timer()*1e3 )
         _ = dc( chunk, blocks, out_gpu )
         t.append( default_timer()*1e3 )
-        sgpu = gpu_sums[ config.dtype.itemsize ]( out_gpu ).get()
+        sgpu = gpu_sums[ config.dtype ]( out_gpu ).get()
         t.append( default_timer()*1e3 )
         if __debug__:
             data = out_gpu.get()
