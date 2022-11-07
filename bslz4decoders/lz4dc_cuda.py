@@ -4,7 +4,7 @@
 
 import os, sys
 import numpy as np, h5py
-
+import timeit
 from bslz4decoders.read_chunks import get_chunk
 
 import pycuda.autoinit, pycuda.driver, pycuda.gpuarray, pycuda.compiler
@@ -29,8 +29,11 @@ class BSLZ4CUDA:
             open('kernel.cu', 'w').write(self.modsrc)
             raise
         self.h5lz4dc   = self.mod.get_function("h5lz4dc")
+        self.h5lz4dc.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.intp] )
         self.shuf_end = self.mod.get_function("simple_shuffle_end")
+        self.shuf_end.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.uint32, np.uint32 ] )
         self.copybytes = self.mod.get_function("copybytes")
+        self.copybytes.prepare( [np.intp, np.uint32, np.intp, np.uint32])
         self.stream = pycuda.driver.Stream()
         self.reset(  total_output_bytes, bpp, blocksize )
 
@@ -41,6 +44,7 @@ class BSLZ4CUDA:
         self.bpp = bpp
         self.blocksize = np.uint32( blocksize )
         self.shuf_8192 = self.mod.get_function( "shuf_8192_%d"%(bpp*8) )
+        self.shuf_8192.prepare( [np.intp, np.intp] )
 
         # number of full 8 kB blocks (rounds down)
         self.nblocks = self.total_output_bytes // 8192
@@ -61,6 +65,7 @@ class BSLZ4CUDA:
         # last few bytes are copied:
         self.bytes_to_copy  = ( self.total_output_bytes % ( bpp * 8 ) )
         # print("bytes to copy", self.bytes_to_copy)
+        self.evt = pycuda.driver.Event()
 
     def __call__(self, chunk, blocks, outarg=None ):
         """
@@ -68,6 +73,7 @@ class BSLZ4CUDA:
         blocks = block start intex (12, ... )
         return out = output array (can be numpy or __cuda_array_interface__)
         """
+#        t = [timeit.default_timer()*1e3,]
         assert len(blocks) == self.tblocks
         if outarg is None: # allocate device and return array
             if self.shuf_d is None:
@@ -85,35 +91,46 @@ class BSLZ4CUDA:
                     self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
                 outd = self.shuf_d
         # the compressed data
-        self.chunk_d[:len(chunk)].set_async( chunk, stream=self.stream )         # compressed data on the device
+#        t += [timeit.default_timer()*1e3,]
+        #self.chunk_d[:len(chunk)].set_async( chunk, stream=self.stream )         # compressed data on the device
+        pycuda.driver.memcpy_htod_async( self.chunk_d.gpudata, chunk, self.stream )
+#        t += [timeit.default_timer()*1e3,]
         # 32 bit offsets into the compressed for blocks :
-        self.blocks_d.set_async( blocks, stream=self.stream )
+        # self.blocks_d.set_async( blocks, stream=self.stream )
+        pycuda.driver.memcpy_htod_async( self.blocks_d.gpudata, blocks, self.stream )
+#        t += [timeit.default_timer()*1e3,]
         # now decompress
-        self.h5lz4dc( self.chunk_d,
-                      self.blocks_d,
-                      np.uint32( self.tblocks ),
-                      self.blocksize,
-                      self.output_d,
-                      block=self.lz4block,
-                      grid=self.lz4grid,
-                      stream=self.stream )
-        self.shuf_8192( self.output_d, outd, block = self.shblock, grid = self.shgrid, stream=self.stream )
+        self.h5lz4dc.prepared_async_call(
+            self.lz4grid,
+            self.lz4block,
+            self.stream,
+            self.chunk_d.gpudata,
+            self.blocks_d.gpudata,
+            self.tblocks,
+            self.blocksize,
+            self.output_d.gpudata,
+            )
+#        t += [timeit.default_timer()*1e3,]
+        self.shuf_8192.prepared_async_call( self.shgrid, self.shblock, self.stream,
+                                            self.output_d.gpudata, outd.gpudata )
+#        t += [timeit.default_timer()*1e3,]
         pos = self.nblocks*self.blocksize
         todo = self.total_output_bytes - pos
         if todo > self.bytes_to_copy:
-            self.shuf_end( self.output_d,
-                           outd,
-                           self.blocksize,
-                           np.uint32(todo),
-                           np.uint32(self.bpp),
-                           np.uint32(pos),
-                           block = (32,1,1), grid = (int((todo+31)//32),1,1), stream=self.stream )
+            self.shuf_end.prepared_async_call((int((todo+31)//32),1,1), (32,1,1), self.stream,
+                                             self.output_d.gpudata, outd.gpudata, self.blocksize,
+                                             todo,
+                                             self.bpp,
+                                             pos)
+#        t += [timeit.default_timer()*1e3,]
         if hasattr( outarg, "__cuda_array_interface__"):
             if self.bytes_to_copy > 0:
-                self.copybytes(  self.chunk_d, np.uint32( chunk.nbytes - self.bytes_to_copy ),
-                                 outd, np.uint32( self.total_output_bytes - self.bytes_to_copy),
-                                 block = ( self.bytes_to_copy, 1, 1 ), grid = (1,1,1),
-                                 stream=self.stream)
+                self.copybytes.prepared_async_call( (1,1,1),( self.bytes_to_copy, 1, 1 ),self.stream,
+                                                    self.chunk_d.gpudata, chunk.nbytes - self.bytes_to_copy,
+                                                    outd.gpudata, self.total_output_bytes - self.bytes_to_copy)
+                t += [timeit.default_timer()*1e3,]
+#            dt = np.array(t)
+#            print('DT', dt[1:]-dt[:-1])
             return outd
         else:
             try:

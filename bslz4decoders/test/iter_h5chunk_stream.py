@@ -45,36 +45,45 @@ def testcuda(hname, dset):
     iterator = iter_h5chunks( hname, dset, memory = pycuda.driver.pagelocked_empty(
         (4096*4096*4,), np.uint8, mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP) )
     frm = 0
-    nb = 0
+    nb = 0##
+    import concurrent.futures#
+    reader = concurrent.futures.ThreadPoolExecutor(1)
+    ##
+    def pipe( iterator ):
+        for config, chunk in iterator:
+            blocks = config.get_blocks( chunk )
+            yield config, chunk, blocks
+    
+    p = pipe( iterator )
+    datafuture = reader.submit( next, p )
+
     while 1:
         t = [ default_timer()*1e3, ]
         try:
             # todo : put this in a different thread. And only get next after
             # you finish reading the data.
-            config,chunk = next( iterator )
+            #            config,chunk = next( iterator )
+            config, chunk, blocks = datafuture.result()
         except:
             break
-        t.append( default_timer()*1e3)
-        blocks = config.get_blocks( chunk )
-        nbytes = config.output_nbytes
-        t.append( default_timer()*1e3)
         if dc is None:
-            dc = BSLZ4CUDA( nbytes, config.dtype.itemsize, config.blocksize )
+            dc = BSLZ4CUDA( config.output_nbytes, config.dtype.itemsize, config.blocksize )
             out_gpu = gpuarray.empty( config.shape, dtype = config.dtype,
-                                          allocator= gpumempool.allocate )  
+                                      allocator= gpumempool.allocate )  
         else:
-            if nbytes != out_gpu.nbytes:
+            if config.output_nbytes != out_gpu.nbytes:
                 out_gpu = gpuarray.empty( config.shape, dtype = config.dtype,
-                                          allocator= gpumempool.allocate )
+                                          allocator = gpumempool.allocate )
                                           
                 dc.reset( config.output_nbytes, config.dtype.itemsize, config.blocksize )
         t.append( default_timer()*1e3 )
         _ = dc( chunk, blocks, out_gpu )
+        datafuture = reader.submit( next, p )
         t.append( default_timer()*1e3 )
         sgpu = gpu_sums[ config.dtype ]( out_gpu, stream=dc.stream )
         t.append( default_timer()*1e3 )
         sgpu = sgpu.get()
-        t.append( default_timer()*1e3 )
+        t.append( default_timer()*1e3 )#
         if __debug__:
             data = out_gpu.get()
             sdata = data.sum( dtype = np.int64)
@@ -94,7 +103,8 @@ def testcuda(hname, dset):
             t1 = default_timer()*1e3
     print("Total time after startup",t[-1]-t0,"ms", t[-1]-t1,'ms after init')
     print("Total GB",nb/1e9,"speed ~ %.3f GB/s  asymptotic ~ %.3f GB/s"%((nb/1e6)/(t[-1]-t0),
-          (nb - config.output_nbytes)/1e6/(t[-1]-t1)))
+                                                                         (nb - config.output_nbytes)/1e6/(t[-1]-t1)))
+    print( frm, 'frames', 1e3*frm/(t[-1]-t0), 1e3*(frm-1)/(t[-1]-t1),'fps')
 
 if __name__=="__main__":
     import sys
