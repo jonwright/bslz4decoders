@@ -9,6 +9,7 @@ from bslz4decoders.read_chunks import get_chunk
 
 import pycuda.autoinit, pycuda.driver, pycuda.gpuarray, pycuda.compiler
 
+
 def get_sources():
     folder =  os.path.join( os.path.split(__file__)[0], "cuda")
     names  = "nvcomp_extract.cu", "h5lz4dc.cu", "shuffles.cu"
@@ -30,7 +31,9 @@ class BSLZ4CUDA:
         self.h5lz4dc   = self.mod.get_function("h5lz4dc")
         self.shuf_end = self.mod.get_function("simple_shuffle_end")
         self.copybytes = self.mod.get_function("copybytes")
+        self.stream = pycuda.driver.Stream()
         self.reset(  total_output_bytes, bpp, blocksize )
+
 
     def reset(self, total_output_bytes, bpp, blocksize):
 
@@ -52,6 +55,7 @@ class BSLZ4CUDA:
         self.lz4block = (32,2,1)
         self.lz4grid = ((self.tblocks+1)//2, 1, 1)
         self.output_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
+        self.chunk_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
         self.blocks_d = pycuda.gpuarray.empty( self.tblocks, np.uint32 )      # 32 bit offsets into the compressed for blocks
         self.shuf_d = None #  hold the final unshuffled data, can be an output arg
         # last few bytes are copied:
@@ -80,17 +84,20 @@ class BSLZ4CUDA:
                 if self.shuf_d is None:
                     self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
                 outd = self.shuf_d
-
-        chunk_d = pycuda.driver.mem_alloc( chunk.nbytes )        # the compressed data
-        pycuda.driver.memcpy_htod( chunk_d, chunk )         # compressed data on the device
-        self.blocks_d[:] = blocks[:]      # 32 bit offsets into the compressed for blocks
-        self.h5lz4dc( chunk_d,
+        # the compressed data
+        self.chunk_d[:len(chunk)].set_async( chunk, stream=self.stream )         # compressed data on the device
+        # 32 bit offsets into the compressed for blocks :
+        self.blocks_d.set_async( blocks, stream=self.stream )
+        # now decompress
+        self.h5lz4dc( self.chunk_d,
                       self.blocks_d,
                       np.uint32( self.tblocks ),
                       self.blocksize,
                       self.output_d,
-                      block=self.lz4block, grid=self.lz4grid )
-        self.shuf_8192( self.output_d, outd, block = self.shblock, grid = self.shgrid )
+                      block=self.lz4block,
+                      grid=self.lz4grid,
+                      stream=self.stream )
+        self.shuf_8192( self.output_d, outd, block = self.shblock, grid = self.shgrid, stream=self.stream )
         pos = self.nblocks*self.blocksize
         todo = self.total_output_bytes - pos
         if todo > self.bytes_to_copy:
@@ -100,12 +107,13 @@ class BSLZ4CUDA:
                            np.uint32(todo),
                            np.uint32(self.bpp),
                            np.uint32(pos),
-                           block = (32,1,1), grid = (int((todo+31)//32),1,1) )
+                           block = (32,1,1), grid = (int((todo+31)//32),1,1), stream=self.stream )
         if hasattr( outarg, "__cuda_array_interface__"):
             if self.bytes_to_copy > 0:
-                self.copybytes(  chunk_d, np.uint32( chunk.nbytes - self.bytes_to_copy ),
+                self.copybytes(  self.chunk_d, np.uint32( chunk.nbytes - self.bytes_to_copy ),
                                  outd, np.uint32( self.total_output_bytes - self.bytes_to_copy),
-                                 block = ( self.bytes_to_copy, 1, 1 ), grid = (1,1,1) )
+                                 block = ( self.bytes_to_copy, 1, 1 ), grid = (1,1,1),
+                                 stream=self.stream)
             return outd
         else:
             try:
