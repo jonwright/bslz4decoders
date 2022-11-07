@@ -46,6 +46,11 @@ lopt['msvc'] = []
 #       python setup.py build_ext --inplace --force \
 #  -IPP=/home/esrf/wright/intel/oneapi/ipp/latest/lib/intel64
 
+# home PC
+# IPPROOT=/opt/intel/oneapi/ipp/latest CFLAGS="-march=native -mtune=native -O2 -g0" \
+#    LDFLAGS="-march=native -mtune=native -O2 -g0" python setup.py build_ext --inplace --force
+#   -IPP=/opt/intel/oneapi/ipp/latest/lib/intel64
+
 
 #  LDSHARED="icc -shared -ipp -ipp-link=static -xHost"                   \
 #   CFLAGS="-DUSEIPP -ipp -ipp-link=static -O3 -std=c99 -fopenmp -xHost" \
@@ -190,3 +195,4 @@ setup( name = "ccodes" ,
 if ippdc is None and platform.machine() == 'x86_64':
     print("Intel IPP was not used")
     print("Add -IPP=/location/of/intel/oneapi/ipp/latest/lib/intel64 to your setup.py command" )
+
