@@ -107,7 +107,7 @@ class BSLZ4ChunkConfigDirect( BSLZ4ChunkConfig ):
         assert ndims == 3
         shape = dsinfo[5:5+ndims]
         self.shape = shape[1], shape[2]
-        self.output_nbytes = self.bpp * shape[1] * shape[2] # per frame
+        self.output_nbytes = int(self.bpp * shape[1] * shape[2]) # per frame
         self.nframes = shape[0]
         #            H5T_INTEGER          = 0,   /*integer types                              */
         #            H5T_FLOAT            = 1,   /*floating-point types                       */
