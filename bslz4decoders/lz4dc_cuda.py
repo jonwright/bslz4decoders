@@ -16,24 +16,25 @@ def get_sources():
     lines = [ open( os.path.join( folder, name ), 'r' ).read() for name in  names ]
     return " ".join( lines )
 
+# Only compile this once on import!
+modsrc = get_sources()
+mod = pycuda.compiler.SourceModule( modsrc )
+h5lz4dc   = mod.get_function("h5lz4dc")
+h5lz4dc.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.intp] )
+shuf_end = mod.get_function("simple_shuffle_end")
+shuf_end.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.uint32, np.uint32 ] )
+copybytes = mod.get_function("copybytes")
+copybytes.prepare( [np.intp, np.uint32, np.intp, np.uint32])
+shuf_8192 = {}
+for bpp in (1,2,4):
+    shuf_8192[bpp] = mod.get_function( "shuf_8192_%d"%(bpp*8) )
+    shuf_8192[bpp].prepare( [np.intp, np.intp] )
 
+        
 class BSLZ4CUDA:
-
-    modsrc = get_sources()
-
+        
     def __init__(self, total_output_bytes, bpp, blocksize, allocator=None ):
         """ cache / reuse memory """
-        try:
-            self.mod = pycuda.compiler.SourceModule( self.modsrc )
-        except:
-            open('kernel.cu', 'w').write(self.modsrc)
-            raise
-        self.h5lz4dc   = self.mod.get_function("h5lz4dc")
-        self.h5lz4dc.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.intp] )
-        self.shuf_end = self.mod.get_function("simple_shuffle_end")
-        self.shuf_end.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.uint32, np.uint32 ] )
-        self.copybytes = self.mod.get_function("copybytes")
-        self.copybytes.prepare( [np.intp, np.uint32, np.intp, np.uint32])
         self.stream = pycuda.driver.Stream()
         self.allocator = allocator
         self.reset(  total_output_bytes, bpp, blocksize )
@@ -44,9 +45,6 @@ class BSLZ4CUDA:
         self.total_output_bytes = total_output_bytes
         self.bpp = bpp
         self.blocksize = np.uint32( blocksize )
-        self.shuf_8192 = self.mod.get_function( "shuf_8192_%d"%(bpp*8) )
-        self.shuf_8192.prepare( [np.intp, np.intp] )
-
         # number of full 8 kB blocks (rounds down)
         self.nblocks = self.total_output_bytes // 8192
         self.tblocks = (self.total_output_bytes + 8191)//8192
@@ -61,13 +59,13 @@ class BSLZ4CUDA:
         self.lz4grid = ((self.tblocks+1)//2, 1, 1)
         self.output_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8, allocator=self.allocator)
         self.chunk_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8, allocator=self.allocator)
-        self.blocks_d = pycuda.gpuarray.empty( self.tblocks, np.uint32, allocator=self.allocator) 
+        self.blocks_d = pycuda.gpuarray.empty( self.tblocks, np.uint32, allocator=self.allocator)
         # 32 bit offsets into the compressed for blocks
         self.shuf_d = None #  hold the final unshuffled data, can be an output arg
         # last few bytes are copied:
         self.bytes_to_copy  = ( self.total_output_bytes % ( bpp * 8 ) )
         # print("bytes to copy", self.bytes_to_copy)
-        self.evt = pycuda.driver.Event()
+
 
     def __call__(self, chunk, blocks, outarg=None ):
         """
@@ -96,7 +94,7 @@ class BSLZ4CUDA:
         # 32 bit offsets into the compressed for blocks :
         pycuda.driver.memcpy_htod_async( self.blocks_d.gpudata, blocks, self.stream )
         # now decompress
-        self.h5lz4dc.prepared_async_call(
+        h5lz4dc.prepared_async_call(
             self.lz4grid,
             self.lz4block,
             self.stream,
@@ -106,19 +104,19 @@ class BSLZ4CUDA:
             self.blocksize,
             self.output_d.gpudata,
             )
-        self.shuf_8192.prepared_async_call( self.shgrid, self.shblock, self.stream,
-                                            self.output_d.gpudata, outd.gpudata )
+        shuf_8192[self.bpp].prepared_async_call( self.shgrid, self.shblock, self.stream,
+                                                      self.output_d.gpudata, outd.gpudata )
         pos = self.nblocks*self.blocksize
         todo = self.total_output_bytes - pos
         if todo > self.bytes_to_copy:
-            self.shuf_end.prepared_async_call((int((todo+31)//32),1,1), (32,1,1), self.stream,
+            shuf_end.prepared_async_call((int((todo+31)//32),1,1), (32,1,1), self.stream,
                                              self.output_d.gpudata, outd.gpudata, self.blocksize,
                                              todo,
                                              self.bpp,
                                              pos)
         if hasattr( outarg, "__cuda_array_interface__"):
             if self.bytes_to_copy > 0:
-                self.copybytes.prepared_async_call( (1,1,1),( self.bytes_to_copy, 1, 1 ),self.stream,
+                copybytes.prepared_async_call( (1,1,1),( self.bytes_to_copy, 1, 1 ),self.stream,
                                                     self.chunk_d.gpudata, chunk.nbytes - self.bytes_to_copy,
                                                     outd.gpudata, self.total_output_bytes - self.bytes_to_copy)
             return outd

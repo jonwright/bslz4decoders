@@ -12,14 +12,17 @@ import pycuda.tools
 
 gpumempool = pycuda.tools.DeviceMemoryPool()
 
+import concurrent.futures
+# one spare thread, not one new one per run
+executor = concurrent.futures.ThreadPoolExecutor(1) 
+
 # summation kernels for reductions
 gpu_sums = { 
         np.dtype('uint8')  : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned char *in" ),
         np.dtype('uint16') : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned short *in" ),
         np.dtype('uint32') : ReductionKernel( np.int64 , "0", "a+b", arguments="const unsigned int *in" ),
-        np.dtype('int32') : ReductionKernel( np.int64 , "0", "a+b", arguments="const int *in" ),
+        np.dtype('int32')  : ReductionKernel( np.int64 , "0", "a+b", arguments="const int *in" ),
     }
-
 
       
 
@@ -29,21 +32,17 @@ def blocker( hname, dset, start, mem ):
         blocks = config.get_blocks( chunk )
         yield config, chunk, blocks
 
-    
+nbytes = 4096*4096*4
+mem = ( pycuda.driver.pagelocked_empty( nbytes, np.uint8, 
+                                        mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP),
+        pycuda.driver.pagelocked_empty( nbytes, np.uint8, 
+                                        mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP) )
     
 def readerblocker( hname, dset ):
-    # ugly.
-    nbytes = 4096*4096*4
-    # page locked memory to read into for transfer to device
-    mem = ( pycuda.driver.pagelocked_empty( nbytes, np.uint8, 
-                                      mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP),
-            pycuda.driver.pagelocked_empty( nbytes, np.uint8, 
-                                      mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP))
+    global mem
     # have 2 reading objects. One will read while the other computes decompression.
     # try to avoid reading into the data that is being transferred
     readers = ( blocker( hname, dset, 0, mem[0]), blocker( hname, dset, 1, mem[1]) )
-    import concurrent.futures
-    executor = concurrent.futures.ThreadPoolExecutor(1) 
     j = 0
     q = executor.submit( next, readers[j] )
     while 1:
@@ -52,7 +51,7 @@ def readerblocker( hname, dset ):
         except StopIteration:
             return
         j = (j+1)%2
-        q = executor.submit( next, readers[j] )         
+        q = executor.submit( next, readers[j] )
         yield result
         
 
@@ -64,7 +63,7 @@ def sum_reduce_cuda(hname, dset):
     frm = 0
     sums = {}
     t0 = default_timer()
-    for config, chunk, blocks in readerblocker( hname, dset ): # threads in here
+    for config, chunk, blocks in readerblocker( hname, dset ): # threads in her
         if dc is None:
             dc = BSLZ4CUDA( config.output_nbytes, config.dtype.itemsize, config.blocksize,
                             allocator=gpumempool.allocate )
@@ -90,5 +89,6 @@ def sum_reduce_cuda(hname, dset):
 
 if __name__=="__main__":
     import sum_testcases
-    sum_testcases.run_sum_testcases( sum_reduce_cuda )
+    for i in range(2):
+        sum_testcases.run_sum_testcases( sum_reduce_cuda )
     
