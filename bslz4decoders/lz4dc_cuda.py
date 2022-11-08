@@ -21,7 +21,7 @@ class BSLZ4CUDA:
 
     modsrc = get_sources()
 
-    def __init__(self, total_output_bytes, bpp, blocksize ):
+    def __init__(self, total_output_bytes, bpp, blocksize, allocator=None ):
         """ cache / reuse memory """
         try:
             self.mod = pycuda.compiler.SourceModule( self.modsrc )
@@ -35,6 +35,7 @@ class BSLZ4CUDA:
         self.copybytes = self.mod.get_function("copybytes")
         self.copybytes.prepare( [np.intp, np.uint32, np.intp, np.uint32])
         self.stream = pycuda.driver.Stream()
+        self.allocator = allocator
         self.reset(  total_output_bytes, bpp, blocksize )
 
 
@@ -58,9 +59,10 @@ class BSLZ4CUDA:
         # ... to be investigated in more detail perhaps
         self.lz4block = (32,2,1)
         self.lz4grid = ((self.tblocks+1)//2, 1, 1)
-        self.output_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
-        self.chunk_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
-        self.blocks_d = pycuda.gpuarray.empty( self.tblocks, np.uint32 )      # 32 bit offsets into the compressed for blocks
+        self.output_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8, allocator=self.allocator)
+        self.chunk_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8, allocator=self.allocator)
+        self.blocks_d = pycuda.gpuarray.empty( self.tblocks, np.uint32, allocator=self.allocator) 
+        # 32 bit offsets into the compressed for blocks
         self.shuf_d = None #  hold the final unshuffled data, can be an output arg
         # last few bytes are copied:
         self.bytes_to_copy  = ( self.total_output_bytes % ( bpp * 8 ) )
@@ -73,11 +75,10 @@ class BSLZ4CUDA:
         blocks = block start intex (12, ... )
         return out = output array (can be numpy or __cuda_array_interface__)
         """
-#        t = [timeit.default_timer()*1e3,]
         assert len(blocks) == self.tblocks
         if outarg is None: # allocate device and return array
             if self.shuf_d is None:
-                self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
+                self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8, allocator=self.allocator )
             outd = self.shuf_d
             out = np.empty( self.total_output_bytes, np.uint8 )
         else:
@@ -88,17 +89,12 @@ class BSLZ4CUDA:
                 assert out.nbytes == self.total_output_bytes, "out is the wrong size"
                 assert len(out.shape) == 1, "use flat/ravelled array for output (no padding)"
                 if self.shuf_d is None:
-                    self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8 )
+                    self.shuf_d = pycuda.gpuarray.empty( self.total_output_bytes, dtype = np.uint8, allocator=self.allocator)
                 outd = self.shuf_d
         # the compressed data
-#        t += [timeit.default_timer()*1e3,]
-        #self.chunk_d[:len(chunk)].set_async( chunk, stream=self.stream )         # compressed data on the device
         pycuda.driver.memcpy_htod_async( self.chunk_d.gpudata, chunk, self.stream )
-#        t += [timeit.default_timer()*1e3,]
         # 32 bit offsets into the compressed for blocks :
-        # self.blocks_d.set_async( blocks, stream=self.stream )
         pycuda.driver.memcpy_htod_async( self.blocks_d.gpudata, blocks, self.stream )
-#        t += [timeit.default_timer()*1e3,]
         # now decompress
         self.h5lz4dc.prepared_async_call(
             self.lz4grid,
@@ -110,10 +106,8 @@ class BSLZ4CUDA:
             self.blocksize,
             self.output_d.gpudata,
             )
-#        t += [timeit.default_timer()*1e3,]
         self.shuf_8192.prepared_async_call( self.shgrid, self.shblock, self.stream,
                                             self.output_d.gpudata, outd.gpudata )
-#        t += [timeit.default_timer()*1e3,]
         pos = self.nblocks*self.blocksize
         todo = self.total_output_bytes - pos
         if todo > self.bytes_to_copy:
@@ -122,15 +116,11 @@ class BSLZ4CUDA:
                                              todo,
                                              self.bpp,
                                              pos)
-#        t += [timeit.default_timer()*1e3,]
         if hasattr( outarg, "__cuda_array_interface__"):
             if self.bytes_to_copy > 0:
                 self.copybytes.prepared_async_call( (1,1,1),( self.bytes_to_copy, 1, 1 ),self.stream,
                                                     self.chunk_d.gpudata, chunk.nbytes - self.bytes_to_copy,
                                                     outd.gpudata, self.total_output_bytes - self.bytes_to_copy)
-                t += [timeit.default_timer()*1e3,]
-#            dt = np.array(t)
-#            print('DT', dt[1:]-dt[:-1])
             return outd
         else:
             try:
