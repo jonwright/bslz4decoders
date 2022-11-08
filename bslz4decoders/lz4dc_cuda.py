@@ -33,7 +33,7 @@ for bpp in (1,2,4):
         
 class BSLZ4CUDA:
         
-    def __init__(self, total_output_bytes, bpp, blocksize, allocator=None ):
+    def __init__(self, total_output_bytes, bpp, blocksize, allocator=pycuda.driver.mem_alloc ):
         """ cache / reuse memory """
         self.stream = pycuda.driver.Stream()
         self.allocator = allocator
