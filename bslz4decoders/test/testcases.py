@@ -7,6 +7,7 @@ def find_testcases():
                        ("/data/id11/nanoscope/blc12454/id11/WAu5um/WAu5um_DT3/scan0001/eiger_0000.h5",
                             "/entry_0000/ESRF-ID11/eiger/data"),
                          ("/data/id11/jon/hdftest/kevlar.h5", "/entry/data/data" ),
+                        ("hplc.h5","/entry_0000/measurement/data"),
                         ):
         if os.path.exists(hname):
             if dset is None:
@@ -19,6 +20,9 @@ def find_testcases():
 
 
 testcases = find_testcases()
+
+
+    
 
 
 
