@@ -66,7 +66,8 @@ class BSLZ4ChunkConfig:
             self.output_nbytes = output_nbytes
         else:
             self.output_nbytes = shape[0]*shape[1]*dtype.itemsize
-
+        self.nblocks =  (self.output_nbytes + self.blocksize - 1) // self.blocksize
+        
     def get_blocks( self, chunk, blocks=None ):
         """
         allow blocks to be pre-allocated (e.g. pinned memory)
@@ -78,9 +79,9 @@ class BSLZ4ChunkConfig:
             total_bytes, self.blocksize = struct.unpack_from("!QL", chunk, 0)
             if self.blocksize == 0:
                 self.blocksize = 8192
-            nblocks =  (total_bytes + self.blocksize - 1) // self.blocksize
+            self.nblocks =  (total_bytes + self.blocksize - 1) // self.blocksize                
             assert self.output_nbytes == total_bytes, "chunk config mismatch:"+repr(self)
-            blocks = np.empty( nblocks, np.uint32 )
+            blocks = np.empty( self.nblocks, np.uint32 )
         read_starts( chunk, self.dtype.itemsize, self.blocksize, blocks )
         return blocks
     
@@ -122,8 +123,8 @@ class BSLZ4ChunkConfigDirect( BSLZ4ChunkConfig ):
             self.dtype = np.dtype( 'uiu'[signed] + str( self.bpp ) ) 
         elif classtype == 1:
             self.dtype = np.dtype( 'f' + str( self.bpp ) )
+        self.nblocks =  (self.output_nbytes + self.blocksize - 1) // self.blocksize
         
-    
     
 def decompress_bitshuffle( chunk, config, output = None ):
     """  Generic bitshuffle decoder depending on the
