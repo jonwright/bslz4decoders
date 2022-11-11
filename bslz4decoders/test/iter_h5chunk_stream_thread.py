@@ -16,7 +16,6 @@ from pycuda.reduction import ReductionKernel
 import pycuda.tools
 import threading, queue
 
-gpumempool = pycuda.tools.DeviceMemoryPool()
 
 # summation kernels for reductions
 gpu_sums = { 
@@ -29,13 +28,12 @@ gpu_sums = {
         np.dtype('int32')  : ReductionKernel(
             np.int64 , "0", "a+b", arguments="const int *in" ),
     }
-# seems the pycuda reduction kernels do better on their own stream
-# ... I did not figure out how to debug this.
-rstream = pycuda.driver.Stream()
+
 
 class payload:
     
     def __init__(self, nbytes, blocksize=8192):
+        self.gpumempool = pycuda.tools.DeviceMemoryPool()
         self.chunk = pycuda.driver.pagelocked_empty(
             nbytes, np.uint8,
             mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP)
@@ -43,13 +41,10 @@ class payload:
             (nbytes + 8192 - 1) // 8192, np.uint32,
             mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP)
         self.sums_d = gpuarray.empty( (1,), np.int64,
-                                      allocator = gpumempool.allocate )
+                                      allocator = self.gpumempool.allocate )
         self.sums = pycuda.driver.pagelocked_empty((1,), np.int64,
             mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP)
         self.dc = None
-        self.event = pycuda.driver.Event()
-        self.ready = pycuda.driver.Event()
-        self.n = 0
         
     def read_direct(self, dsid, frame ):
         self.frame = frame
@@ -67,40 +62,32 @@ class payload:
             self.dc = BSLZ4CUDA( self.config.output_nbytes,
                                  self.config.dtype.itemsize,
                                  self.config.blocksize,
-                                 allocator=gpumempool.allocate )
+                                 allocator=self.gpumempool.allocate )
             self.out_gpu = gpuarray.empty( self.config.shape,
                                            dtype = self.config.dtype,
-                                           allocator= gpumempool.allocate )  
+                                           allocator= self.gpumempool.allocate )  
         else:
             if self.config.output_nbytes != self.out_gpu.nbytes:
                 self.out_gpu = gpuarray.empty( self.config.shape,
                                           dtype = self.config.dtype,
-                                          allocator = gpumempool.allocate )
+                                          allocator = self.gpumempool.allocate )
                 self.dc.reset( self.config.output_nbytes,
                           self.config.dtype.itemsize,
                           self.config.blocksize )
         _ = self.dc( self.chunk[:self.nbytesread],
                      self.blocks[:self.config.nblocks], self.out_gpu )
-        self.event.record( self.dc.stream )
-        rstream.wait_for_event( self.event )
         gpu_sums[ self.config.dtype ]( self.out_gpu,
                                        out = self.sums_d,
-                                       stream = rstream,
-                                       allocator = gpumempool.allocate )
+                                       stream = self.dc.stream,
+                                       allocator = self.gpumempool.allocate )
         pycuda.driver.memcpy_dtoh_async( self.sums,
                                          self.sums_d.gpudata,
-                                         stream = rstream )
-        self.ready.record( rstream )
-        self.dc.stream.wait_for_event( self.ready )
+                                         stream = self.dc.stream )
 
 
 
             
-
-
-
-
-        
+    
 
         
         
@@ -156,7 +143,7 @@ class UnBlock( threading.Thread ):
 
             
 nbytes = 2168*2064*4
-nthread = 6
+nthread = 8
 
 h5q = queue.Queue()      # filenames
 emptyq = queue.Queue()   # chunks
