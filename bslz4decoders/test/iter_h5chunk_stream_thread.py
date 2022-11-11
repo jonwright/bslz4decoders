@@ -76,6 +76,11 @@ class payload:
                           self.config.blocksize )
         _ = self.dc( self.chunk[:self.nbytesread],
                      self.blocks[:self.config.nblocks], self.out_gpu )
+        self.computed = False
+
+    def compute(self):
+        if self.computed:
+            return
         gpu_sums[ self.config.dtype ]( self.out_gpu,
                                        out = self.sums_d,
                                        stream = self.dc.stream,
@@ -83,7 +88,7 @@ class payload:
         pycuda.driver.memcpy_dtoh_async( self.sums,
                                          self.sums_d.gpudata,
                                          stream = self.dc.stream )
-
+        self.computed=True
 
 
             
@@ -172,13 +177,17 @@ def sum_reduce_cuda( hname, dset ):
         if p == 0:
             break
         p.rungpu()
+        if len(ongpu):
+            ongpu[-1].compute()
         ongpu.append( p )
-        if len(ongpu)>nthread//2:
+        if len(ongpu)>4:
             p = ongpu.pop(0)
             p.dc.stream.synchronize()
             sums[p.frame] = int(p.sums)
             emptyq.put(p)
-    for i in range(len(ongpu)):
+    if len(ongpu):
+        ongpu[-1].compute()    
+    for i in range(len(ongpu)):        
         p = ongpu.pop(0)
         p.dc.stream.synchronize()
         sums[p.frame] = int(p.sums)
