@@ -10,6 +10,7 @@ import numpy as np
 from timeit import default_timer
 from pycuda import gpuarray
 import pycuda.driver
+import pycuda.autoinit
 from pycuda.reduction import ReductionKernel
 
 import pycuda.tools
@@ -28,18 +29,27 @@ gpu_sums = {
         np.dtype('int32')  : ReductionKernel(
             np.int64 , "0", "a+b", arguments="const int *in" ),
     }
+# seems the pycuda reduction kernels do better on their own stream
+# ... I did not figure out how to debug this.
+rstream = pycuda.driver.Stream()
 
 class payload:
     
     def __init__(self, nbytes, blocksize=8192):
         self.chunk = pycuda.driver.pagelocked_empty(
-            nbytes, np.uint8,  
+            nbytes, np.uint8,
             mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP)
         self.blocks = pycuda.driver.pagelocked_empty(
             (nbytes + 8192 - 1) // 8192, np.uint32,
             mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP)
-        self.sums = np.zeros( (1024,), np.int64 )
+        self.sums_d = gpuarray.empty( (1,), np.int64,
+                                      allocator = gpumempool.allocate )
+        self.sums = pycuda.driver.pagelocked_empty((1,), np.int64,
+            mem_flags=pycuda.driver.host_alloc_flags.DEVICEMAP)
         self.dc = None
+        self.event = pycuda.driver.Event()
+        self.ready = pycuda.driver.Event()
+        self.n = 0
         
     def read_direct(self, dsid, frame ):
         self.frame = frame
@@ -51,6 +61,7 @@ class payload:
                      self.config.dtype.itemsize,
                      self.config.blocksize,
                      self.blocks[:self.config.nblocks] )
+        
     def rungpu(self):
         if self.dc is None:
             self.dc = BSLZ4CUDA( self.config.output_nbytes,
@@ -70,8 +81,24 @@ class payload:
                           self.config.blocksize )
         _ = self.dc( self.chunk[:self.nbytesread],
                      self.blocks[:self.config.nblocks], self.out_gpu )
-        self.sgpu = gpu_sums[ self.config.dtype ]( self.out_gpu, stream=self.dc.stream )
-        self.sgpu.get_async( stream = self.dc.stream, ary = self.sums[self.frame % 1024:self.frame % 1024+1] )
+        self.event.record( self.dc.stream )
+        rstream.wait_for_event( self.event )
+        gpu_sums[ self.config.dtype ]( self.out_gpu,
+                                       out = self.sums_d,
+                                       stream = rstream,
+                                       allocator = gpumempool.allocate )
+        pycuda.driver.memcpy_dtoh_async( self.sums,
+                                         self.sums_d.gpudata,
+                                         stream = rstream )
+        self.ready.record( rstream )
+        self.dc.stream.wait_for_event( self.ready )
+
+
+
+            
+
+
+
 
         
 
@@ -129,7 +156,7 @@ class UnBlock( threading.Thread ):
 
             
 nbytes = 2168*2064*4
-nthread = 8
+nthread = 6
 
 h5q = queue.Queue()      # filenames
 emptyq = queue.Queue()   # chunks
@@ -144,6 +171,7 @@ buff = {}
 
 for i in range(nthread):
     buff[i] = payload( nbytes )
+    buff[i].name = i
 
     
 def sum_reduce_cuda( hname, dset ):
@@ -161,18 +189,20 @@ def sum_reduce_cuda( hname, dset ):
         if len(ongpu)>nthread//2:
             p = ongpu.pop(0)
             p.dc.stream.synchronize()
-            sums[p.frame] = p.sums[p.frame%1024]
+            sums[p.frame] = int(p.sums)
             emptyq.put(p)
     for i in range(len(ongpu)):
         p = ongpu.pop(0)
-        sums[p.frame] = p.sgpu.get()
+        p.dc.stream.synchronize()
+        sums[p.frame] = int(p.sums)
     while emptyq.qsize():
         emptyq.get_nowait()
     return sums
 
 
 
-if __name__=="__main__":
+
+def main():
     import sum_testcases
     try:
         for i in range(3):
@@ -182,5 +212,26 @@ if __name__=="__main__":
         blq.put(None)
         reader.join()
         blocker.join()
-            
+        for i in range(nthread):
+            b = buff.pop(i)
+            del b
+        
     
+def bug():
+    try:
+        sum_reduce_cuda( 'eiger_0000.h5', 'entry_0000/measurement/data' )
+    except:
+        print("Got an error")
+        raise
+    finally:
+        h5q.put( (None, None) )
+        blq.put(None)
+        reader.join()
+        blocker.join()
+        for i in range(nthread):
+            b = buff.pop(i)
+            del b
+
+if __name__=="__main__":
+#    bug()
+    main()

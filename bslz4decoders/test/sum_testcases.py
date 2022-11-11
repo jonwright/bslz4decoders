@@ -42,7 +42,7 @@ def run_sum_testcases( func ):
             for i in range(len(refdata)):
                 if sums[i] != refdata[i]:
                     print( i, sums[i], refdata[i])
-                assert sums[i] == refdata[i], sums[i]
+                assert sums[i] == refdata[i], (i,'got',sums[i],'want',refdata[i])
             dt = t1 - t0
             print("Matches reference sum data %.3f ms/frame  %.1f fps"%(1e3*dt/len(sums), len(sums)/dt))
         
