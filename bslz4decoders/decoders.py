@@ -55,7 +55,7 @@ class BSLZ4ChunkConfig:
     blocksize = transpose blocksize for bitshuffle
     npytype = numpy dtype == convenience
     """
-    __slots__ = [ "shape", "dtype", "blocksize", "output_nbytes", "bpp" ]
+    __slots__ = [ "shape", "dtype", "blocksize", "output_nbytes", "bpp", "nblocks" ]
 
     def __init__(self, shape, dtype, blocksize=8192, output_nbytes=None ):
         self.shape = shape
