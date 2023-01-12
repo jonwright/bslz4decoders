@@ -2,7 +2,7 @@
 
 import sys, hdf5plugin, h5py, timeit, numpy as np
 
-from bslz4decoders.read_chunks import iter_h5chunks
+from bslz4decoders.read_chunks import iter_h5chunks, iter_chunks
 from bslz4decoders import decoders
 
 def read_simple( hname, dsetname, mem=None, membuf=None ):
@@ -20,31 +20,21 @@ def read_direct( hname, dsetname, mem = None, membuf=None ):
     return mem
 
 
-def _read_h5chunk( decoder, hname, dsetname, mem = None, membuf = None ):
+def h5py_chunks( decoder, hname, dsetname, mem = None, membuf = None ):
+    # calls iter_chunks that uses h5py direct_chunk_read (and mallocs)
+    for i, (config, chunk) in enumerate( iter_chunks( hname, dsetname )):
+        decoder( chunk, config, output = mem[i] )
+    return mem
+
+
+def hdf5_chunks( decoder, hname, dsetname, mem = None, membuf = None ):
+    # calls into hdf5 using an existing memory buffer (membuf)
     for i, (config, chunk) in enumerate( iter_h5chunks( hname, dsetname, memory=membuf )):
         decoder( chunk, config, output = mem[i] )
     return mem
 
-def read_h5chunk_decompress_onecore( hname, dsetname, mem = None, membuf = None ):
-    return _read_h5chunk( decoders.decompress_onecore, hname, dsetname, mem = mem, membuf = membuf )
 
-def read_h5chunk_decompress_omp( hname, dsetname, mem = None, membuf = None ):
-    return _read_h5chunk( decoders.decompress_omp, hname, dsetname,  mem = mem, membuf = membuf )
-
-def read_h5chunk_decompress_omp_blocks( hname, dsetname, mem = None, membuf = None ):
-    return _read_h5chunk( decoders.decompress_omp_blocks, hname, dsetname,  mem = mem, membuf = membuf )
-
-def read_h5chunk_decompress_ipponecore( hname, dsetname, mem = None, membuf = None ):
-    return _read_h5chunk( decoders.decompress_ipponecore, hname, dsetname,  mem = mem, membuf = membuf )
-
-def read_h5chunk_decompress_ippomp( hname, dsetname, mem = None, membuf = None ):
-    return _read_h5chunk( decoders.decompress_ippomp, hname, dsetname,  mem = mem, membuf = membuf )
-
-def read_h5chunk_decompress_ippomp_blocks( hname, dsetname, mem = None, membuf = None ):
-    return _read_h5chunk( decoders.decompress_ippomp_blocks, hname, dsetname,  mem = mem, membuf = membuf )
-
-
-def measure(fun, *args ):
+def measure(ref, fun, *args ):
     for i in range(3):
         start = timeit.default_timer()
         data = fun( *args )
@@ -52,7 +42,8 @@ def measure(fun, *args ):
         dt = end - start
         mb = data.nbytes / 1e6 # generous
         print(fun.__name__, i, "%6.1f MB, %6.3f ms, %6.1f MB/s" % ( mb, 1e3*dt, mb / dt ) )
-    return data
+        if not (ref == data).all():
+            print('Error!')
 
 
 if __name__=="__main__":
@@ -64,21 +55,23 @@ if __name__=="__main__":
         
     o0 = read_simple( hname, dset )
     obuf = np.zeros(4096*4096*4,np.uint8)
-    for fun in (read_simple, 
-                read_direct, 
-                read_h5chunk_decompress_onecore,
-                read_h5chunk_decompress_ipponecore,
-                read_h5chunk_decompress_omp,
-                read_h5chunk_decompress_ippomp,
-                read_h5chunk_decompress_omp_blocks,
-                read_h5chunk_decompress_ippomp_blocks) :
-        omem = np.zeros_like(o0)
-        o1 = measure( fun, hname, dset, omem, obuf )
-        for i,(f0, f1) in enumerate(zip(o0, o1)):
-            if not (f0 == f1).all():
-                print('error in frame',i)
-                print(f0)
-                print(f1)
+    omem = np.zeros_like(o0)
+        
+    for chunkreader in (h5py_chunks, hdf5_chunks):
+        for decompressor in [decoders.decompress_bitshuffle,
+                         decoders.decompress_onecore,
+                         decoders.decompress_ipponecore,
+                         decoders.decompress_omp,
+                         decoders.decompress_ippomp,
+                         decoders.decompress_omp_blocks,
+                         decoders.decompress_ippomp_blocks ]:
+             def fun( *args ):
+                return chunkreader( decompressor, *args )
+             fun.__name__ = f'{chunkreader.__name__}|{decompressor.__name__}'
+             measure(o0, fun, hname, dset, omem, obuf )
+
+    for fun in [ read_simple, read_direct ]:
+        measure(o0, fun, hname, dset, omem, obuf )
     
     
 
