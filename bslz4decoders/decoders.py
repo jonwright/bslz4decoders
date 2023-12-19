@@ -125,7 +125,7 @@ class BSLZ4ChunkConfigDirect( BSLZ4ChunkConfig ):
             self.dtype = np.dtype( 'f' + str( self.bpp ) )
         self.nblocks =  (self.output_nbytes + self.blocksize - 1) // self.blocksize
         
-    
+
 def decompress_bitshuffle( chunk, config, output = None ):
     """  Generic bitshuffle decoder depending on the
     bitshuffle library from https://github.com/kiyo-masui/bitshuffle
@@ -144,6 +144,7 @@ def decompress_bitshuffle( chunk, config, output = None ):
         output = r
     return output
 
+decompressors = [ decompress_bitshuffle, ]    
 
 
 def decompress_onecore( chunk, config, output = None ):
@@ -159,6 +160,8 @@ def decompress_onecore( chunk, config, output = None ):
     # TODO: put the bitshuffle into C !
     return output.view(config.dtype).reshape( config.shape )
 
+decompressors.append( decompress_onecore )
+
 
 def decompress_omp( chunk, config, output = None, num_threads=0):
     """  Openmp decoding from our ccodes module
@@ -173,6 +176,8 @@ def decompress_omp( chunk, config, output = None, num_threads=0):
     if err:
         raise Exception("Decoding error")
     return output.view(config.dtype).reshape( config.shape )
+
+decompressors.append( decompress_omp )
 
 
 def decompress_omp_blocks( chunk, config,
@@ -197,6 +202,7 @@ def decompress_omp_blocks( chunk, config,
         raise Exception("Decoding error")
     return output.view(config.dtype).reshape( config.shape )
 
+decompressors.append( decompress_omp_blocks )
 
 if GOTIPP:
     def decompress_ipponecore( chunk, config, output = None ):
@@ -212,6 +218,7 @@ if GOTIPP:
         # TODO: put the bitshuffle into C !
         return output.view(config.dtype).reshape( config.shape )
 
+    decompressors.append( decompress_ipponecore )
 
     def decompress_ippomp( chunk, config, output = None, num_threads=0):
         """  Openmp decoding from our ccodes module
@@ -228,6 +235,7 @@ if GOTIPP:
             raise Exception("Decoding error")
         return output.view(config.dtype).reshape( config.shape )
 
+    decompressors.append( decompress_ippomp )
 
     def decompress_ippomp_blocks( chunk, config,
                                   offsets=None,
@@ -251,3 +259,5 @@ if GOTIPP:
         if err:
             raise Exception("Decoding error")
         return output.view(config.dtype).reshape( config.shape )
+
+    decompressors.append( decompress_ippomp_blocks )

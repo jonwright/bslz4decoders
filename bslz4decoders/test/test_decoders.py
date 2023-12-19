@@ -74,6 +74,8 @@ def testchunkdecoders():
             runtest_lz4chunkdecoders( getattr( decoders, func ) )
         except AttributeError:
             print('Missing', func)
+#            print(dir(decoders))
+            #raise
         
 
 

@@ -52,19 +52,14 @@ if __name__=="__main__":
         dset = sys.argv[2]
     except IndexError:
         import testcases
+        hname, dset = testcases.testcases[0]
         
+    print(hname, dset)
     o0 = read_simple( hname, dset )
     obuf = np.zeros(4096*4096*4,np.uint8)
     omem = np.zeros_like(o0)
-        
     for chunkreader in (h5py_chunks, hdf5_chunks):
-        for decompressor in [decoders.decompress_bitshuffle,
-                         decoders.decompress_onecore,
-                         decoders.decompress_ipponecore,
-                         decoders.decompress_omp,
-                         decoders.decompress_ippomp,
-                         decoders.decompress_omp_blocks,
-                         decoders.decompress_ippomp_blocks ]:
+        for decompressor in decoders.decompressors:
              def fun( *args ):
                 return chunkreader( decompressor, *args )
              fun.__name__ = f'{chunkreader.__name__}|{decompressor.__name__}'

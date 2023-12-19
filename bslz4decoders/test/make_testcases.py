@@ -49,7 +49,7 @@ def make_testcases( hname) :
 
 
 def make_blobtests( hname, dsname, method = "uniform15" ):
-    from bslz4decoders.ccodes.decoders import onecore_lz4
+    from bslz4decoders.ccodes.decoders import onecore_bslz4
     with h5py.File( hname, "r" ) as h5f:
         name = dsname
         for dtyp, label in ( ( np.uint8 , 'u8' ),
@@ -62,7 +62,7 @@ def make_blobtests( hname, dsname, method = "uniform15" ):
                 fout.write( blob )
             with open( dsname + ".bs", "wb" ) as fout:
                 output = np.empty( ref.shape, ref.dtype )
-                onecore_lz4( np.frombuffer(blob, np.uint8) ,
+                onecore_bslz4( np.frombuffer(blob, np.uint8) ,
                              h5f[dsname].dtype.itemsize,
                              output.ravel().view(np.uint8) )
                 fout.write( output.tobytes( ) ) # did numpy rename this yet?
