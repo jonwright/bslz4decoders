@@ -5,7 +5,7 @@ A bunch of things to copy paste together fragments of C-code
 This is like a literate style but without the readability.
 """
 
-import os, numpy.f2py, tempfile
+import os, numpy.f2py, tempfile, shutil
 
 
 class compiler:
@@ -178,6 +178,8 @@ CLANG_FORMAT = "clang-format -i "
 if os.path.exists(r"C:/program files/LLVM/bin/clang-format.exe"):
     CLANG_FORMAT = r'"C:/program files/LLVM/bin/clang-format.exe" -i '
 
+if shutil.which( CLANG_FORMAT ) is None:
+    CLANG_FORMAT='echo '
 
 def write_funcs(fname, funcs, includes, macros):
     """ Write a series of functions into a file """

@@ -82,12 +82,15 @@ def h5config():
     print("got h5cc = ",h5cc)
     if os.path.exists(h5cc):
         with open(h5cc,'r') as f:
-            cfg = { 'prefix': '', 'libdir':'', 'libdevdir': '', 'includedir': ''}
+            cfg = { 'prefix': '', 'exec_prefix' : '', 'libdir':'', 'libdevdir': '', 'includedir': '', }
             for line in f.readlines():
                 for key in cfg:
                     if line.startswith( key ):
-                        value = line.split( "=" )[1].replace('"', '').strip().replace("${prefix}", cfg['prefix'] )
+                        value = line.split( "=" )[1].replace('"', '').strip()
+                        value = value.replace("${prefix}", cfg['prefix'] )
+                        value = value.replace("${exec_prefix}", cfg['exec_prefix'] )
                         cfg[key] = value
+        print(cfg)
         return cfg
     else:
         print("Cannot open h5cc")
@@ -97,7 +100,7 @@ def compile_paths( places ):
     h5cfg = h5config()
     if h5cfg is not None:
         incdirs = [ h5cfg[ 'includedir' ] , ]
-        libdirs = [ h5cfg[ 'libdevdir'  ] , ]
+        libdirs = [ h5cfg[ 'libdir'  ] , ]
     incdirs += [ numpy.get_include(), fortraninc, bsinc ]
     for place in places:
         for root in [os.path.join( place, "Library" ), place ]:

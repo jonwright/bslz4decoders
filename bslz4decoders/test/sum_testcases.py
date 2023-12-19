@@ -4,7 +4,8 @@ import numpy as np, h5py, hdf5plugin
 import timeit
 import os
 
-cases =  [ ("/data/id11/nanoscope/blc12454/id11/WAu5um/WAu5um_DT3/scan0001/eiger_0000.h5", "/entry_0000/ESRF-ID11/eiger/data"),
+cases =  [ ("/data/id11/nanoscope/blc12454/id11/WAu5um/WAu5um_DT3/scan0001/eiger_0000.h5", 
+            "/entry_0000/ESRF-ID11/eiger/data"),
            ("/data/id11/jon/hdftest/kevlar.h5", "/entry/data/data" ),
            ("hplc.h5","/entry_0000/measurement/data"),
          ]
@@ -44,7 +45,8 @@ def run_sum_testcases( func ):
                     print( i, sums[i], refdata[i])
                 assert sums[i] == refdata[i], (i,'got',sums[i],'want',refdata[i])
             dt = t1 - t0
-            print("Matches reference sum data %.3f ms/frame  %.1f fps"%(1e3*dt/len(sums), len(sums)/dt))
+            print("Matches reference sum data %.3f ms/frame  %.1f fps"%(1e3*dt/len(sums), len(sums)/dt),
+                  refdata.shape)
         
         
         
