@@ -119,8 +119,8 @@ if os.path.exists( "/nobackup/scratch/HDF5/HDF5-1.10.5" ): # scisoft15
 
 incdirs, libdirs = compile_paths( places )
 
-print(incdirs)
-print(libdirs)
+print('incdirs',incdirs)
+print('libdirs',libdirs)
 
 
 
