@@ -52,7 +52,7 @@ def get_chunk( h5name, dsetname, frame ):
     config = BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
     # if we use frombuffer we get write-only memory that has to be copied in f2py
     # ... because const can be cast away in C I guess
-    ar = np.fromstring( buffer, np.uint8 )
+    ar = np.frombuffer( buffer, np.uint8 )
     return config, ar
 
 def get_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
@@ -68,7 +68,7 @@ def get_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
     config =  BSLZ4ChunkConfig( (dset.shape[1], dset.shape[2]), dset.dtype )
     for frame in range(firstframe, lastframe, stepframe):
         filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
-        chunks.append( np.fromstring( buffer, np.uint8 ) )
+        chunks.append( np.frombuffer( buffer, np.uint8 ) )
     return config, chunks
 
 def iter_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
@@ -83,7 +83,7 @@ def iter_chunks( h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
     config = BSLZ4ChunkConfig( ( dset.shape[1], dset.shape[2]), dset.dtype )
     for frame in range(firstframe, lastframe, stepframe):
         filterlist, buffer = dset.id.read_direct_chunk( (frame, 0, 0 ) )
-        yield config, np.fromstring( buffer, np.uint8 )
+        yield config, np.frombuffer( buffer, np.uint8 )
 
 def queue_chunks( q, h5name, dset, firstframe=0, lastframe=None, stepframe=1 ):
     """ move this elsewhere ... """
