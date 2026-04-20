@@ -1,4 +1,6 @@
 
+
+""" By sonnet/aider """
 import sys
 import time
 import numpy as np
@@ -124,7 +126,7 @@ def benchmark_read_starts(h5name, dsetname, num_warmup=10, num_iterations=100):
             print("Python:", blocks_python[:10])
             return
         
-        print("✓ All implementations produce identical results")
+        print("All implementations produce identical results")
         print()
         
         # Benchmark C version
@@ -189,14 +191,6 @@ def benchmark_read_starts(h5name, dsetname, num_warmup=10, num_iterations=100):
         print(f"Python is {mean_python/mean_c:.2f}x slower than C")
         print(f"Numba is {mean_python/mean_numba:.2f}x faster than Python")
         print()
-        
-        # Calculate percentage of total decompression time
-        # Rough estimate: assume decompression takes ~1ms per frame
-        estimated_decomp_time = 1000  # microseconds
-        print(f"Estimated impact on total decompression time:")
-        print(f"  C:      {mean_c/estimated_decomp_time*100:.2f}% of frame decode time")
-        print(f"  Numba:  {mean_numba/estimated_decomp_time*100:.2f}% of frame decode time")
-        print(f"  Python: {mean_python/estimated_decomp_time*100:.2f}% of frame decode time")
 
 
 if __name__ == "__main__":
