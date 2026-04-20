@@ -13,6 +13,23 @@ __global__ void copybytes(uint8_t * src, uint32_t srcstart, uint8_t * dst, uint3
   dst[threadIdx.x + dststart] = src[threadIdx.x+srcstart];
 }
 
+/* Device function version for use in fused kernels */
+__device__ void shuffle_8192_block_32(const uint32_t* in, uint32_t* out, int block_offset) {
+    __shared__ uint32_t smem[32][33];
+    uint32_t v;
+    
+    smem[threadIdx.y][threadIdx.x] = in[threadIdx.x + threadIdx.y*64 + block_offset];
+    __syncthreads();
+    
+    v = smem[threadIdx.x][threadIdx.y];
+    #pragma unroll 32
+    for(int i = 0; i < 32; i++)
+        smem[i][threadIdx.y] = __ballot_sync(0xFFFFFFFFU, v & (1U<<i));
+    __syncthreads();
+    
+    out[threadIdx.x + threadIdx.y*32] = smem[threadIdx.x][threadIdx.y];
+}
+
 __global__ void shuf_8192_32(const uint32_t * __restrict__ in,
                                    uint32_t * __restrict__ out ){
     /*
@@ -44,6 +61,28 @@ __global__ void shuf_8192_32(const uint32_t * __restrict__ in,
      out[ threadIdx.x + threadIdx.y*32 + blockIdx.y*1024 + blockIdx.x*2048 ] = smem[threadIdx.x][threadIdx.y];
 }
 
+
+/* Device function version for use in fused kernels */
+__device__ void shuffle_8192_block_16(const uint32_t* in, uint32_t* out, int block_offset) {
+    __shared__ uint32_t smem[32][33];
+    
+    int itemx = threadIdx.x / 16;
+    int shft = 16*itemx;
+    uint32_t v, mask = 0xFFFFU << shft;
+    
+    smem[threadIdx.y][threadIdx.x] = in[threadIdx.x + (threadIdx.y/16)*32 + (threadIdx.y%16)*128 + block_offset];
+    __syncthreads();
+    
+    v = smem[threadIdx.x][threadIdx.y];
+    #pragma unroll 32
+    for(int i = 0; i < 32; i++)
+        smem[i][threadIdx.y] = __ballot_sync(0xFFFFFFFFU, v & (1U<<i));
+    __syncthreads();
+    
+    out[threadIdx.x + shft*31 + threadIdx.y*16] = 
+        ((smem[2*(threadIdx.x%16)][threadIdx.y] & mask) >> shft) |
+        ((smem[2*(threadIdx.x%16)+1][threadIdx.y] & mask) << 16-shft);
+}
 
 __global__ void shuf_8192_16(const uint32_t * __restrict__ in,
                                    uint32_t * __restrict__ out ){
@@ -85,6 +124,55 @@ __global__ void shuf_8192_16(const uint32_t * __restrict__ in,
     out[ threadIdx.x + shft * 31 + threadIdx.y*16 + blockIdx.y*1024 + blockIdx.x*2048 ] =
         ( ( smem[ 2 * (threadIdx.x%16)   ][ threadIdx.y ] & mask ) >> shft ) |
         ( ( smem[ 2 * (threadIdx.x%16)+1 ][ threadIdx.y ] & mask ) << 16-shft );
+}
+
+/* Device function version for use in fused kernels */
+__device__ void shuffle_8192_block_8(const uint32_t* in, uint32_t* out, int block_offset) {
+    __shared__ uint32_t smem[32][33];
+    
+    uint32_t bitx = 4*(threadIdx.x % 8);
+    uint32_t bytx = threadIdx.x / 8;
+    uint32_t mask = 0xFFU << (8*bytx);
+    
+    smem[threadIdx.y][threadIdx.x] = in[threadIdx.x + (threadIdx.y/8)*32 + (threadIdx.y%8)*256 + block_offset];
+    __syncthreads();
+    
+    uint32_t v = smem[threadIdx.x][threadIdx.y];
+    #pragma unroll 32
+    for(int i = 0; i < 32; i++)
+        smem[i][threadIdx.y] = __ballot_sync(0xFFFFFFFFU, v & (1U<<i));
+    
+    v = 0U;
+    __syncthreads();
+    
+    switch(bytx) {
+        case 0:
+            v |= ((smem[bitx][threadIdx.y] & mask));
+            v |= ((smem[bitx+1][threadIdx.y] & mask) << 8);
+            v |= ((smem[bitx+2][threadIdx.y] & mask) << 16);
+            v |= ((smem[bitx+3][threadIdx.y] & mask) << 24);
+            break;
+        case 1:
+            v |= ((smem[bitx+1][threadIdx.y] & mask));
+            v |= ((smem[bitx+2][threadIdx.y] & mask) << 8);
+            v |= ((smem[bitx+3][threadIdx.y] & mask) << 16);
+            v |= ((smem[bitx][threadIdx.y] & mask) >> 8);
+            break;
+        case 2:
+            v |= ((smem[bitx+2][threadIdx.y] & mask));
+            v |= ((smem[bitx+3][threadIdx.y] & mask) << 8);
+            v |= ((smem[bitx][threadIdx.y] & mask) >> 16);
+            v |= ((smem[bitx+1][threadIdx.y] & mask) >> 8);
+            break;
+        case 3:
+            v |= ((smem[bitx+3][threadIdx.y] & mask));
+            v |= ((smem[bitx][threadIdx.y] & mask) >> 24);
+            v |= ((smem[bitx+1][threadIdx.y] & mask) >> 16);
+            v |= ((smem[bitx+2][threadIdx.y] & mask) >> 8);
+            break;
+    }
+    
+    out[threadIdx.x + (threadIdx.x/8)*248 + threadIdx.y*8] = v;
 }
 
 __global__ void shuf_8192_8(const uint32_t * __restrict__ in,

@@ -21,6 +21,10 @@ modsrc = get_sources()
 mod = pycuda.compiler.SourceModule( modsrc )
 h5lz4dc   = mod.get_function("h5lz4dc")
 h5lz4dc.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.intp] )
+h5lz4dc_batch = mod.get_function("h5lz4dc_batch")
+h5lz4dc_batch.prepare( [np.intp, np.intp, np.intp, np.uint32, np.intp] )
+h5lz4dc_shuffle_batch = mod.get_function("h5lz4dc_shuffle_batch")
+h5lz4dc_shuffle_batch.prepare( [np.intp, np.intp, np.intp, np.intp, np.uint32, np.uint32, np.intp] )
 shuf_end = mod.get_function("simple_shuffle_end")
 shuf_end.prepare( [np.intp, np.intp, np.uint32, np.uint32, np.uint32, np.uint32 ] )
 copybytes = mod.get_function("copybytes")
@@ -130,6 +134,86 @@ class BSLZ4CUDA:
                 out[-self.bytes_to_copy:] = chunk[-self.bytes_to_copy:]
             return out
         raise Exception("failed")
+
+    def batch_call(self, chunks_list, blocks_list, outputs_list):
+        """
+        Process multiple images in a single fused kernel call.
+        
+        chunks_list: list of compressed chunk arrays (numpy or pagelocked)
+        blocks_list: list of block start arrays
+        outputs_list: list of output arrays (numpy or GPU arrays)
+        
+        All images must have same bpp and blocksize (configured in __init__).
+        Returns list of output arrays.
+        """
+        num_images = len(chunks_list)
+        assert len(blocks_list) == num_images
+        assert len(outputs_list) == num_images
+        
+        # Allocate device memory for pointer arrays
+        compressed_ptrs_h = np.empty(num_images, dtype=np.intp)
+        blocks_ptrs_h = np.empty(num_images, dtype=np.intp)
+        output_ptrs_h = np.empty(num_images, dtype=np.intp)
+        num_blocks_h = np.empty(num_images, dtype=np.uint32)
+        total_bytes_h = np.empty(num_images, dtype=np.uint32)
+        
+        # Upload chunks and blocks, collect pointers
+        chunks_d = []
+        blocks_d = []
+        outputs_d = []
+        
+        for i in range(num_images):
+            # Upload compressed chunk
+            chunk_d = pycuda.gpuarray.to_gpu(chunks_list[i])
+            chunks_d.append(chunk_d)
+            compressed_ptrs_h[i] = int(chunk_d.gpudata)
+            
+            # Upload block starts
+            block_d = pycuda.gpuarray.to_gpu(blocks_list[i])
+            blocks_d.append(block_d)
+            blocks_ptrs_h[i] = int(block_d.gpudata)
+            num_blocks_h[i] = len(blocks_list[i])
+            
+            # Handle output
+            if hasattr(outputs_list[i], "__cuda_array_interface__"):
+                output_d = outputs_list[i]
+            else:
+                output_d = pycuda.gpuarray.to_gpu(outputs_list[i])
+            outputs_d.append(output_d)
+            output_ptrs_h[i] = int(output_d.gpudata)
+            total_bytes_h[i] = self.total_output_bytes
+        
+        # Upload pointer arrays
+        compressed_ptrs_d = pycuda.gpuarray.to_gpu(compressed_ptrs_h)
+        blocks_ptrs_d = pycuda.gpuarray.to_gpu(blocks_ptrs_h)
+        output_ptrs_d = pycuda.gpuarray.to_gpu(output_ptrs_h)
+        num_blocks_d = pycuda.gpuarray.to_gpu(num_blocks_h)
+        total_bytes_d = pycuda.gpuarray.to_gpu(total_bytes_h)
+        
+        # Launch fused kernel
+        max_blocks = int(num_blocks_h.max())
+        lz4grid = ((max_blocks + 1) // 2, 1, num_images)
+        
+        h5lz4dc_shuffle_batch.prepared_call(
+            lz4grid,
+            self.lz4block,
+            compressed_ptrs_d.gpudata,
+            blocks_ptrs_d.gpudata,
+            num_blocks_d.gpudata,
+            total_bytes_d.gpudata,
+            self.blocksize,
+            np.uint32(self.bpp),
+            output_ptrs_d.gpudata
+        )
+        
+        # Download results for numpy outputs
+        results = []
+        for i in range(num_images):
+            if not hasattr(outputs_list[i], "__cuda_array_interface__"):
+                outputs_d[i].get(outputs_list[i])
+            results.append(outputs_list[i])
+        
+        return results
 
 def testcase( hname, dset, frm):
     print("Reading", hname, "::", dset, "[", frm, "]")
