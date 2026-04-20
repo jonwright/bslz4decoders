@@ -9,11 +9,10 @@ if 0:
     import codegen
     codegen.main()
 
-# import setuptools
 import os, sys, platform, os.path
 
-from distutils.core import setup, Extension
-from distutils.command import build_ext
+from setuptools import setup, Extension
+from setuptools.command import build_ext
 import numpy, numpy.f2py
 
 
