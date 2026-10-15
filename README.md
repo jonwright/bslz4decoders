@@ -1,3 +1,6 @@
+# 2026: Warning!
+
+Most of this code is obsolete now. There is better cuda code in https://github.com/jonwright/bslz4_to_sparse
 
 # Some source code for reading bslz4 data
 
@@ -6,6 +9,7 @@ by Jon Wright, 2021.
 If you are here to read your data you probably want 
 [hdf5plugin](https://pypi.org/project/hdf5plugin/) or
 [bitshuffle](https://pypi.org/project/bitshuffle/) instead.
+
 
 These are research / experimental codes to see if we can read and reduce 
 data from ID11-ESRF more quickly.
